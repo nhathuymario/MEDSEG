@@ -1,0 +1,33 @@
+# Core ML
+torch>=2.0
+torchvision>=0.15
+numpy
+pandas
+scikit-learn
+
+# Image Processing
+opencv-python
+Pillow
+albumentations
+
+# Visualization
+matplotlib
+seaborn
+tensorboard
+
+# Config
+PyYAML
+omegaconf
+
+# API
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Testing
+pytest
+pytest-cov
+httpx
+
+# Utilities
+tqdm

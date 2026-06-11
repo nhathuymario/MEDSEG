@@ -1,0 +1,55 @@
+"""Medical image augmentations using Albumentations."""
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+
+
+def get_train_transforms(size=256):
+    return A.Compose([
+        A.Resize(size, size),
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
+        A.RandomRotate90(p=0.5),
+        A.RandomBrightnessContrast(p=0.3),
+        A.ElasticTransform(alpha=120, sigma=6, p=0.2),
+        A.CLAHE(clip_limit=2.0, p=0.3),
+        A.CoarseDropout(max_holes=4, max_height=32, max_width=32, p=0.2),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ToTensorV2(),
+    ])
+
+
+def get_val_transforms(size=256):
+    return A.Compose([
+        A.Resize(size, size),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ToTensorV2(),
+    ])
+
+
+def get_chest_xray_train_transforms(size=256):
+    """Conservative augmentation for frontal chest radiographs."""
+    return A.Compose([
+        A.Resize(size, size),
+        A.HorizontalFlip(p=0.5),
+        A.RandomBrightnessContrast(p=0.3),
+        A.CLAHE(clip_limit=2.0, p=0.3),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ToTensorV2(),
+    ])
+
+
+def get_detection_transforms(size=512, train=True):
+    """Transforms for detection (with bbox support)."""
+    if train:
+        return A.Compose([
+            A.Resize(size, size),
+            A.HorizontalFlip(p=0.5),
+            A.RandomBrightnessContrast(p=0.3),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            ToTensorV2(),
+        ], bbox_params=A.BboxParams(format="pascal_voc", label_fields=["labels"]))
+    return A.Compose([
+        A.Resize(size, size),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ToTensorV2(),
+    ], bbox_params=A.BboxParams(format="pascal_voc", label_fields=["labels"]))

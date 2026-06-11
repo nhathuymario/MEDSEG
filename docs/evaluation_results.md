@@ -1,0 +1,26 @@
+# Kết quả Đánh giá (Evaluation Results)
+
+*Lưu ý: File này sẽ được cập nhật liên tục sau các đợt training và evaluation.*
+
+## 1. Detection (Faster R-CNN) - ISIC 2018
+| Metric | Threshold | Value | Target | Status |
+|--------|-----------|-------|--------|--------|
+| mAP    | 0.5       | -     | >= 0.60| Pending |
+| mAP    | 0.5:0.95  | -     | -      | Pending |
+| FPS (Inference) | - | - | - | Pending |
+
+## 2. Segmentation - ISIC 2018
+| Model | Dice Score | IoU (Jaccard) | Sensitivity | Specificity | Target Dice | Status |
+|-------|------------|---------------|-------------|-------------|-------------|--------|
+| U-Net | - | - | - | - | >= 0.85 | Pending |
+| Attention U-Net | - | - | - | - | >= 0.85 | Pending |
+
+## 3. Lung Segmentation - Chest X-ray
+| Model | Dice Score | IoU (Jaccard) | Sensitivity | Specificity | Target Dice | Status |
+|-------|------------|---------------|-------------|-------------|-------------|--------|
+| U-Net | - | - | - | - | >= 0.90 | Pending |
+
+## 4. Full Pipeline Performance
+- **Thời gian xử lý trung bình (End-to-End)**: Đang cập nhật.
+- **Tốc độ trên CPU**: Đang cập nhật.
+- **Tốc độ trên GPU**: Đang cập nhật.

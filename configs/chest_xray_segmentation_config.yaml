@@ -1,0 +1,25 @@
+model:
+  name: attention_unet
+  in_channels: 3
+  out_channels: 1
+  features: [32, 64, 128, 256]
+
+data:
+  dataset: chest_xray
+  image_dir: data/processed/chest_xray/images
+  mask_dir: data/processed/chest_xray/masks
+  split_dir: data/splits/chest_xray
+  image_size: [256, 256]
+  batch_size: 4
+  num_workers: 0
+
+training:
+  epochs: 100
+  lr: 0.0001
+  optimizer: adam
+  loss: dice_bce
+  lr_scheduler: cosine
+  checkpoint_path: outputs/checkpoints/best_chest_xray_segmentation.pth
+
+evaluation:
+  threshold: 0.5
