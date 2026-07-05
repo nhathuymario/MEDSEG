@@ -1,4 +1,5 @@
 """Training loop for U-Net / Attention U-Net segmentation."""
+import csv
 import torch
 from pathlib import Path
 from torch.utils.data import DataLoader
@@ -27,6 +28,13 @@ def train_segmentation(model, train_dataset, val_dataset=None, config=None):
             "outputs/checkpoints/best_segmentation.pth",
         )
     )
+    history_path = Path(
+        cfg.get(
+            "history_path",
+            f"outputs/logs/{checkpoint_path.stem}_training_history.csv",
+        )
+    )
+    use_amp = cfg.get("mixed_precision", True) and device.type == "cuda"
 
     train_loader = DataLoader(
         train_dataset,
@@ -47,37 +55,64 @@ def train_segmentation(model, train_dataset, val_dataset=None, config=None):
     criterion = DiceBCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
     best_dice = 0
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(history_path, "w", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "epoch",
+                "train_loss",
+                "train_dice",
+                "val_loss",
+                "val_dice",
+                "lr",
+            ],
+        )
+        writer.writeheader()
+
     for epoch in range(epochs):
         model.train()
         total_loss, total_dice = 0, 0
         for imgs, masks in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
             imgs, masks = imgs.to(device), masks.to(device)
-            pred = model(imgs)
-            loss = criterion(pred, masks)
 
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            with torch.amp.autocast("cuda", enabled=use_amp):
+                pred = model(imgs)
+                loss = criterion(pred, masks)
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
             total_loss += loss.item()
             total_dice += dice_score(pred, masks).item()
 
         scheduler.step()
         n = len(train_loader)
-        print(f"Epoch {epoch+1}: loss={total_loss/n:.4f}, dice={total_dice/n:.4f}")
+        train_loss = total_loss / n
+        train_dice = total_dice / n
+        current_lr = scheduler.get_last_lr()[0]
+        print(f"Epoch {epoch+1}: loss={train_loss:.4f}, dice={train_dice:.4f}")
 
         # Validation
+        val_loss = None
+        val_dice = None
         if val_loader:
             model.eval()
-            val_dice = 0
+            total_val_loss, total_val_dice = 0, 0
             with torch.no_grad():
                 for imgs, masks in val_loader:
                     imgs, masks = imgs.to(device), masks.to(device)
-                    pred = model(imgs)
-                    val_dice += dice_score(pred, masks).item()
-            val_dice /= len(val_loader)
+                    with torch.amp.autocast("cuda", enabled=use_amp):
+                        pred = model(imgs)
+                        loss = criterion(pred, masks)
+                    total_val_loss += loss.item()
+                    total_val_dice += dice_score(pred, masks).item()
+            val_loss = total_val_loss / len(val_loader)
+            val_dice = total_val_dice / len(val_loader)
             print(f"  Val Dice: {val_dice:.4f}")
             if val_dice > best_dice:
                 best_dice = val_dice
@@ -85,4 +120,28 @@ def train_segmentation(model, train_dataset, val_dataset=None, config=None):
                 torch.save(model.state_dict(), checkpoint_path)
                 print(f"  Saved best model (dice={best_dice:.4f})")
 
+        with open(history_path, "a", newline="") as handle:
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=[
+                    "epoch",
+                    "train_loss",
+                    "train_dice",
+                    "val_loss",
+                    "val_dice",
+                    "lr",
+                ],
+            )
+            writer.writerow(
+                {
+                    "epoch": epoch + 1,
+                    "train_loss": train_loss,
+                    "train_dice": train_dice,
+                    "val_loss": val_loss if val_loss is not None else "",
+                    "val_dice": val_dice if val_dice is not None else "",
+                    "lr": current_lr,
+                }
+            )
+
+    print(f"Saved training history to {history_path}")
     return model

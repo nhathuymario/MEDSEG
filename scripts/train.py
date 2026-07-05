@@ -1,8 +1,14 @@
 """Main training script."""
 import argparse
 import csv
+import sys
 import yaml
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from src.data.dataset_detection import DetectionDataset
 from src.data.dataset_segmentation import SegmentationDataset
 from src.data.transforms import (
@@ -31,10 +37,17 @@ def _read_split(split_dir, split_name):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, help="Path to config yaml")
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        help="Override the number of training epochs",
+    )
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
+    if args.epochs is not None:
+        config.setdefault("training", {})["epochs"] = args.epochs
 
     model_name = config["model"]["name"]
     data_config = config.get("data", {})

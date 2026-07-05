@@ -9,7 +9,10 @@ class LesionDetector(nn.Module):
     def __init__(self, num_classes=2, pretrained=True):
         super().__init__()
         weights = FasterRCNN_ResNet50_FPN_Weights.DEFAULT if pretrained else None
-        self.model = fasterrcnn_resnet50_fpn(weights=weights)
+        self.model = fasterrcnn_resnet50_fpn(
+            weights=weights,
+            weights_backbone=None if not pretrained else None,
+        )
         in_features = self.model.roi_heads.box_predictor.cls_score.in_features
         self.model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 

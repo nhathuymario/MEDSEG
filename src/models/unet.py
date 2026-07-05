@@ -10,9 +10,7 @@ class UNet(nn.Module):
         self.inc = DoubleConv(in_ch, features[0])
         self.downs = nn.ModuleList([DownBlock(features[i], features[i + 1]) for i in range(len(features) - 1)])
         self.bottleneck = DownBlock(features[-1], features[-1] * 2)
-        self.ups = nn.ModuleList([UpBlock(features[i + 1] * 2 if i == len(features) - 1 else features[i + 1], features[i]) for i in reversed(range(len(features)))])
 
-        # Fix: build ups correctly
         self.ups = nn.ModuleList()
         rev = list(reversed(features))
         self.ups.append(UpBlock(features[-1] * 2, rev[0]))  # bottleneck -> last feature

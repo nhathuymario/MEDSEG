@@ -6,7 +6,6 @@ from .transforms import (
     get_val_transforms,
 )
 from .split import create_splits
-from .preprocess import prepare_chest_xray
 
 
 def download_isic2018(*args, **kwargs):
@@ -19,3 +18,9 @@ def download_chest_xray(*args, **kwargs):
     from .download import download_chest_xray as download
 
     return download(*args, **kwargs)
+
+
+def prepare_chest_xray(*args, **kwargs):
+    from .preprocess import prepare_chest_xray as prepare
+
+    return prepare(*args, **kwargs)

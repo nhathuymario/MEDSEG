@@ -12,7 +12,12 @@ def get_train_transforms(size=256):
         A.RandomBrightnessContrast(p=0.3),
         A.ElasticTransform(alpha=120, sigma=6, p=0.2),
         A.CLAHE(clip_limit=2.0, p=0.3),
-        A.CoarseDropout(max_holes=4, max_height=32, max_width=32, p=0.2),
+        A.CoarseDropout(
+            num_holes_range=(1, 4),
+            hole_height_range=(8, 32),
+            hole_width_range=(8, 32),
+            p=0.2,
+        ),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
     ])

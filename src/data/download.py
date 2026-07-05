@@ -163,7 +163,10 @@ def download_isic2018(base_dir: Path = RAW_DIR / "isic2018"):
     print("ISIC 2018 download complete!")
 
 
-def download_chest_xray(base_dir: Path = RAW_DIR / "chest_xray"):
+def download_chest_xray(
+    base_dir: Path = RAW_DIR / "chest_xray",
+    datasets=("montgomery", "shenzhen"),
+):
     """Download the official Montgomery and Shenzhen CXR datasets from NLM."""
     base_dir.mkdir(parents=True, exist_ok=True)
     roots = {
@@ -178,7 +181,10 @@ def download_chest_xray(base_dir: Path = RAW_DIR / "chest_xray"):
     }
 
     jobs = []
-    for dataset_name, root_url in roots.items():
+    for dataset_name in datasets:
+        if dataset_name not in roots:
+            raise ValueError(f"Unknown Chest X-ray dataset: {dataset_name}")
+        root_url = roots[dataset_name]
         jobs.extend(_list_remote_files(root_url, base_dir / dataset_name))
 
     print(f"Found {len(jobs)} Chest X-ray files.")
@@ -266,7 +272,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download MedSeg datasets")
     parser.add_argument(
         "--dataset",
-        choices=("all", "isic2018", "chest_xray"),
+        choices=("all", "isic2018", "chest_xray", "montgomery", "shenzhen"),
         default="all",
     )
     args = parser.parse_args()
@@ -275,3 +281,5 @@ if __name__ == "__main__":
         download_isic2018()
     if args.dataset in ("all", "chest_xray"):
         download_chest_xray()
+    elif args.dataset in ("montgomery", "shenzhen"):
+        download_chest_xray(datasets=(args.dataset,))
