@@ -1,27 +1,52 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
+
+const MODEL_INFO = {
+  detector: {
+    label: 'Phát hiện tổn thương da ISIC',
+    detail: 'Faster R-CNN',
+  },
+  isic_segmentor: {
+    label: 'Phân đoạn tổn thương da ISIC',
+    detail: 'Attention U-Net',
+  },
+  chest_segmentor: {
+    label: 'Phân đoạn phổi X-quang',
+    detail: 'Attention U-Net',
+  },
+};
+
+const MODE_LABELS = {
+  detect: 'Phát hiện tổn thương da',
+  segment: 'Phân đoạn phổi X-quang',
+  pipeline: 'Pipeline ISIC đầy đủ',
+};
 
 export default function Dashboard() {
   const [health, setHealth] = useState(null);
   const [history] = useState(() => JSON.parse(localStorage.getItem('medseg_history') || '[]'));
 
   useEffect(() => {
-    api.health().then(setHealth).catch(() => setHealth({ status: 'offline', gpu_available: false, models_loaded: [] }));
+    api.health()
+      .then(setHealth)
+      .catch(() => setHealth({ status: 'offline', gpu_available: false, models_loaded: [] }));
   }, []);
 
+  const loadedModels = useMemo(() => health?.models_loaded || [], [health]);
+
   const stats = [
-    { value: history.length, label: 'Total Analyses', color: 'var(--accent)' },
-    { value: health?.gpu_available ? 'Yes' : 'No', label: 'GPU Available', color: health?.gpu_available ? 'var(--success)' : 'var(--warning)' },
-    { value: health?.models_loaded?.length || 0, label: 'Models Loaded', color: 'var(--accent)' },
-    { value: health?.status || '...', label: 'API Status', color: health?.status === 'ok' ? 'var(--success)' : 'var(--danger)' },
+    { value: history.length, label: 'Tổng lượt phân tích', color: 'var(--accent)' },
+    { value: health?.gpu_available ? 'Có' : 'Không', label: 'GPU khả dụng', color: health?.gpu_available ? 'var(--success)' : 'var(--warning)' },
+    { value: loadedModels.length, label: 'Model đã tải', color: 'var(--accent)' },
+    { value: health?.status === 'ok' ? 'ổn định' : (health?.status ? 'mất kết nối' : '...'), label: 'Trạng thái API', color: health?.status === 'ok' ? 'var(--success)' : 'var(--danger)' },
   ];
 
   return (
     <div>
-      <h1 className="page-title">Dashboard</h1>
+      <h1 className="page-title">Tổng quan</h1>
       <div className="stats-grid">
         {stats.map((s, i) => (
-          <div className="stat-card" key={i} style={{ animationDelay: `${i * 0.1}s` }}>
+          <div className="stat-card" key={s.label} style={{ animationDelay: `${i * 0.1}s` }}>
             <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
             <div className="stat-label">{s.label}</div>
           </div>
@@ -29,26 +54,37 @@ export default function Dashboard() {
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
-        <h3 style={{ marginBottom: 16 }}>🧠 Available Models</h3>
+        <h3 style={{ marginBottom: 16 }}>Model backend đã tải</h3>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {['Faster R-CNN (Detection)', 'U-Net (Segmentation)', 'Attention U-Net (Segmentation)'].map(m => (
-            <div key={m} className="model-option">{m}</div>
-          ))}
+          {loadedModels.length === 0 ? (
+            <p style={{ color: 'var(--text-secondary)' }}>Backend chưa tải checkpoint nào.</p>
+          ) : (
+            loadedModels.map((name) => {
+              const info = MODEL_INFO[name] || { label: name, detail: 'Model backend' };
+              return (
+                <div key={name} className="model-option ready">
+                  <span className="model-title">{info.label}</span>
+                  <span className="model-meta">{info.detail}</span>
+                  <span className="status-pill ready">{name}</span>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
-        <h3 style={{ marginBottom: 16 }}>📋 Recent Analyses</h3>
+        <h3 style={{ marginBottom: 16 }}>Phân tích gần đây</h3>
         {history.length === 0 ? (
-          <p style={{ color: 'var(--text-secondary)' }}>No analyses yet. Go to Analyze to get started.</p>
+          <p style={{ color: 'var(--text-secondary)' }}>Chưa có lượt phân tích nào. Vào trang Phân tích để bắt đầu.</p>
         ) : (
           <table>
-            <thead><tr><th>Time</th><th>Mode</th><th>Detections</th></tr></thead>
+            <thead><tr><th>Thời gian</th><th>Chế độ</th><th>Vùng phát hiện</th></tr></thead>
             <tbody>
               {history.slice(-5).reverse().map((h, i) => (
-                <tr key={i}>
+                <tr key={`${h.timestamp}-${i}`}>
                   <td>{new Date(h.timestamp).toLocaleString()}</td>
-                  <td>{h.mode}</td>
+                  <td>{MODE_LABELS[h.mode] || h.mode}</td>
                   <td>{h.detections ?? '-'}</td>
                 </tr>
               ))}

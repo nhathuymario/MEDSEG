@@ -7,13 +7,19 @@ async function post(endpoint, file) {
   const form = new FormData();
   form.append('file', file);
   const res = await fetch(`${BASE}${endpoint}`, { method: 'POST', body: form });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail || `Lỗi API: ${res.status}`);
+  }
   return res.json();
 }
 
 async function get(endpoint) {
   const res = await fetch(`${BASE}${endpoint}`);
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail || `Lỗi API: ${res.status}`);
+  }
   return res.json();
 }
 

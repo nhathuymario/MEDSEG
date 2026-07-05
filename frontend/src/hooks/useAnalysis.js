@@ -12,9 +12,12 @@ export function useAnalysis() {
     try {
       const fn = { detect: api.detect, segment: api.segment, pipeline: api.pipeline };
       const data = await fn[mode](file);
-      setResult({ ...data, mode, timestamp: Date.now() });
+      const nextResult = { ...data, mode, timestamp: Date.now() };
+      setResult(nextResult);
+      return nextResult;
     } catch (e) {
       setError(e.message);
+      return null;
     } finally {
       setLoading(false);
     }

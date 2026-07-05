@@ -3,28 +3,27 @@ export default function ResultPanel({ result, mode }) {
 
   return (
     <div className="card" style={{ marginTop: 16 }}>
-      <h3 style={{ marginBottom: 16 }}>📊 Analysis Results</h3>
+      <h3 style={{ marginBottom: 16 }}>Kết quả phân tích</h3>
 
-      {/* Inference time */}
       <div className="metrics-grid" style={{ marginBottom: 16 }}>
         <div className="metric-card">
           <div className="metric-value good">
             {(result.inference_time_ms || result.total_time_ms || 0).toFixed(0)}ms
           </div>
-          <div className="metric-label">Inference Time</div>
+          <div className="metric-label">Thời gian suy luận</div>
         </div>
 
         {(mode === 'detect' || mode === 'pipeline') && result.boxes && (
           <div className="metric-card">
             <div className="metric-value" style={{ color: 'var(--accent)' }}>{result.boxes?.length || 0}</div>
-            <div className="metric-label">Detections</div>
+            <div className="metric-label">Vùng phát hiện</div>
           </div>
         )}
 
         {result.detection && (
           <div className="metric-card">
             <div className="metric-value" style={{ color: 'var(--accent)' }}>{result.detection?.boxes?.length || 0}</div>
-            <div className="metric-label">Detections</div>
+            <div className="metric-label">Vùng phát hiện</div>
           </div>
         )}
 
@@ -33,16 +32,15 @@ export default function ResultPanel({ result, mode }) {
             <div className={`metric-value ${result.dice_score > 0.8 ? 'good' : 'warn'}`}>
               {(result.dice_score * 100).toFixed(1)}%
             </div>
-            <div className="metric-label">Dice Score</div>
+            <div className="metric-label">Điểm Dice</div>
           </div>
         )}
       </div>
 
-      {/* Detection table */}
       {(result.boxes?.length > 0 || result.detection?.boxes?.length > 0) && (
         <div className="table-wrap">
           <table>
-            <thead><tr><th>#</th><th>Bounding Box</th><th>Confidence</th></tr></thead>
+            <thead><tr><th>#</th><th>Bounding box</th><th>Độ tin cậy</th></tr></thead>
             <tbody>
               {(result.boxes || result.detection?.boxes || []).map((box, i) => (
                 <tr key={i}>
