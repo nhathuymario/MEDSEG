@@ -19,6 +19,7 @@ training:
   optimizer: adam
   loss: dice_bce
   lr_scheduler: cosine
+  mixed_precision: true
   checkpoint_path: outputs/checkpoints/best_chest_xray_segmentation.pth
 
 evaluation:

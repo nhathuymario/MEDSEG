@@ -1,9 +1,23 @@
 """FastAPI backend for MedSeg inference."""
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routers import detection, segmentation, pipeline, health
+from api.services.model_service import model_service
 
-app = FastAPI(title="MedSeg API", version="1.0.0", description="Medical Image Detection & Segmentation API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    model_service.load_default_models()
+    yield
+
+
+app = FastAPI(
+    title="MedSeg API",
+    version="1.0.0",
+    description="Medical Image Detection & Segmentation API",
+    lifespan=lifespan,
+)
 
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://localhost:3000"], allow_methods=["*"], allow_headers=["*"])
 

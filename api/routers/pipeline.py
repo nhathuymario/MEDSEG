@@ -1,6 +1,6 @@
 """Full pipeline endpoint: Detection → Segmentation."""
 import time
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, HTTPException
 from api.schemas.responses import PipelineResult, DetectionResult
 from api.services.model_service import model_service
 
@@ -13,14 +13,30 @@ async def run_pipeline(file: UploadFile = File(...)):
 
     t0 = time.time()
     detector = model_service.get_model("detector")
-    segmentor = model_service.get_model("segmentor")
+    segmentor = model_service.get_model("isic_segmentor")
+    if detector is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Full pipeline is unavailable because the ISIC Faster R-CNN "
+                "checkpoint has not been trained/loaded."
+            ),
+        )
+    if segmentor is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Full pipeline is unavailable because the ISIC segmentation "
+                "checkpoint has not been trained/loaded."
+            ),
+        )
 
     # Detection
     from src.pipeline.inference import run_detection, run_segmentation
     from src.evaluation.visualize import draw_boxes, overlay_mask
     import numpy as np
 
-    det = run_detection(detector, image, str(model_service.device)) if detector else {"boxes": [], "scores": [], "labels": []}
+    det = run_detection(detector, image, str(model_service.device))
 
     # Segmentation per ROI
     masks_b64 = []

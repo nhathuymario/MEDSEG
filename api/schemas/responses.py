@@ -7,6 +7,7 @@ class DetectionResult(BaseModel):
     boxes: List[List[float]]
     scores: List[float]
     labels: List[int]
+    overlay_base64: Optional[str] = None
     inference_time_ms: float
 
 

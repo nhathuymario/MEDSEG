@@ -1,6 +1,6 @@
 """Model loading & inference service (singleton)."""
+import os
 import torch
-import time
 import base64
 import io
 import cv2
@@ -26,10 +26,59 @@ class ModelService:
         self._initialized = True
 
     def load_model(self, name: str, model, checkpoint_path: str = None):
-        if checkpoint_path and Path(checkpoint_path).exists():
-            model.load_state_dict(torch.load(checkpoint_path, map_location=self.device))
+        if checkpoint_path:
+            path = Path(checkpoint_path)
+            if not path.exists():
+                raise FileNotFoundError(f"Checkpoint not found: {path}")
+            model.load_state_dict(torch.load(path, map_location=self.device))
         model.eval().to(self.device)
         self.models[name] = model
+
+    def load_default_models(self):
+        from src.models.attention_unet import AttentionUNet
+        from src.models.faster_rcnn import LesionDetector
+
+        chest_checkpoint = os.getenv(
+            "CHEST_XRAY_CHECKPOINT",
+            "outputs/checkpoints/best_chest_xray_segmentation.pth",
+        )
+        if (
+            Path(chest_checkpoint).exists()
+            and "chest_segmentor" not in self.models
+        ):
+            model = AttentionUNet(
+                in_ch=3,
+                out_ch=1,
+                features=(32, 64, 128, 256),
+            )
+            self.load_model("chest_segmentor", model, chest_checkpoint)
+
+        detection_checkpoint = os.getenv(
+            "ISIC_DETECTION_CHECKPOINT",
+            "outputs/checkpoints/best_detection.pth",
+        )
+        if Path(detection_checkpoint).exists() and "detector" not in self.models:
+            detector = LesionDetector(num_classes=2, pretrained=False)
+            self.load_model("detector", detector, detection_checkpoint)
+
+        isic_segmentation_checkpoint = os.getenv(
+            "ISIC_SEGMENTATION_CHECKPOINT",
+            "outputs/checkpoints/best_segmentation.pth",
+        )
+        if (
+            Path(isic_segmentation_checkpoint).exists()
+            and "isic_segmentor" not in self.models
+        ):
+            segmentor = AttentionUNet(
+                in_ch=3,
+                out_ch=1,
+                features=(64, 128, 256, 512),
+            )
+            self.load_model(
+                "isic_segmentor",
+                segmentor,
+                isic_segmentation_checkpoint,
+            )
 
     def get_model(self, name: str):
         return self.models.get(name)
@@ -47,6 +96,13 @@ class ModelService:
     def decode_upload(file_bytes: bytes) -> np.ndarray:
         img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
         return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+    @staticmethod
+    def preprocess_chest_xray(image: np.ndarray) -> np.ndarray:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(gray)
+        return cv2.cvtColor(enhanced, cv2.COLOR_GRAY2BGR)
 
 
 model_service = ModelService()
