@@ -2,6 +2,28 @@
 
 *Lưu ý: File này sẽ được cập nhật liên tục sau các đợt training và evaluation.*
 
+## Chest X-ray Lung Segmentation
+
+- Dataset: Montgomery County CXR Set
+- Model: Attention U-Net
+- Input size: 256x256
+- Split: 96 train / 20 validation / 22 test
+- Training: 100 epochs, Adam, Dice + BCE, mixed precision
+- Best validation Dice: 0.9771
+- Checkpoint: `outputs/checkpoints/best_chest_xray_segmentation.pth`
+
+### Test Results
+
+| Metric | Score |
+|---|---:|
+| Dice | 0.9811 |
+| IoU | 0.9628 |
+| Sensitivity | 0.9804 |
+| Specificity | 0.9932 |
+| Pixel accuracy | 0.9897 |
+
+These results measure lung-field segmentation, not lesion localization.
+
 ## 1. Detection (Faster R-CNN) - ISIC 2018
 | Metric | Threshold | Value | Target | Status |
 |--------|-----------|-------|--------|--------|
