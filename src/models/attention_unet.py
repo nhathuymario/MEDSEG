@@ -1,4 +1,4 @@
-"""Attention U-Net: U-Net + Attention Gates on skip connections."""
+"""Attention U-Net: U-Net có attention gate trên skip connection."""
 import torch
 import torch.nn as nn
 from .components import DoubleConv, AttentionGate
@@ -9,17 +9,17 @@ class AttentionUNet(nn.Module):
         super().__init__()
         self.pool = nn.MaxPool2d(2)
 
-        # Encoder
+        # Encoder: trích đặc trưng đa tỉ lệ.
         self.enc = nn.ModuleList()
         ch = in_ch
         for f in features:
             self.enc.append(DoubleConv(ch, f))
             ch = f
 
-        # Bottleneck
+        # Bottleneck: tầng sâu nhất, chứa ngữ cảnh lớn nhất.
         self.bottleneck = DoubleConv(features[-1], features[-1] * 2)
 
-        # Decoder (with attention gates)
+        # Decoder: attention gate lọc skip features trước khi nối với decoder.
         self.ups = nn.ModuleList()
         self.attn = nn.ModuleList()
         self.dec = nn.ModuleList()
@@ -46,6 +46,7 @@ class AttentionUNet(nn.Module):
         # Decoder
         for up, attn, dec, skip in zip(self.ups, self.attn, self.dec, reversed(skips)):
             x = up(x)
+            # Gate dùng tín hiệu decoder để giữ vùng encoder feature quan trọng.
             skip = attn(g=x, x=skip)
             x = torch.cat([x, skip], dim=1)
             x = dec(x)

@@ -1,9 +1,9 @@
-"""Reusable convolution building blocks."""
+"""Các block convolution tái sử dụng cho U-Net."""
 import torch.nn as nn
 
 
 class DoubleConv(nn.Module):
-    """Conv2d -> BN -> ReLU -> Conv2d -> BN -> ReLU"""
+    """Hai lớp Conv2d liên tiếp, mỗi lớp kèm BatchNorm và ReLU."""
     def __init__(self, in_ch, out_ch):
         super().__init__()
         self.conv = nn.Sequential(
@@ -20,7 +20,7 @@ class DoubleConv(nn.Module):
 
 
 class DownBlock(nn.Module):
-    """MaxPool -> DoubleConv"""
+    """Giảm kích thước H/W bằng MaxPool rồi trích đặc trưng bằng DoubleConv."""
     def __init__(self, in_ch, out_ch):
         super().__init__()
         self.block = nn.Sequential(nn.MaxPool2d(2), DoubleConv(in_ch, out_ch))
@@ -30,7 +30,7 @@ class DownBlock(nn.Module):
 
 
 class UpBlock(nn.Module):
-    """ConvTranspose2d -> Concat skip -> DoubleConv"""
+    """Upsample bằng ConvTranspose2d, nối skip connection, rồi DoubleConv."""
     def __init__(self, in_ch, out_ch):
         super().__init__()
         self.up = nn.ConvTranspose2d(in_ch, in_ch // 2, kernel_size=2, stride=2)

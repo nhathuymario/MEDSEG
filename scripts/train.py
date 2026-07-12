@@ -59,6 +59,9 @@ def main():
     if model_name == "faster_rcnn":
         if dataset_name != "isic2018":
             raise ValueError("Faster R-CNN training currently supports ISIC 2018 only.")
+        split_dir = data_config.get("split_dir", f"data/splits/{dataset_name}")
+        train_files = _read_split(split_dir, "train")
+        val_files = _read_split(split_dir, "val")
         train_ds = DetectionDataset(
             image_dir=data_config.get(
                 "image_dir", "data/processed/isic2018/images"
@@ -67,11 +70,27 @@ def main():
                 "annotation_file",
                 "data/processed/isic2018/annotations/train.json",
             ),
+            file_list=train_files,
             transforms=get_detection_transforms(size=image_size, train=True),
         )
+        val_ds = DetectionDataset(
+            image_dir=data_config.get(
+                "image_dir", "data/processed/isic2018/images"
+            ),
+            annotation_file=data_config.get(
+                "annotation_file",
+                "data/processed/isic2018/annotations/train.json",
+            ),
+            file_list=val_files,
+            transforms=get_detection_transforms(size=image_size, train=False),
+        )
         model = LesionDetector(num_classes=config["model"]["num_classes"])
-        training_config = {**data_config, **config.get("training", {})}
-        train_detection(model, train_ds, config=training_config)
+        training_config = {
+            **data_config,
+            **config.get("training", {}),
+            **config.get("evaluation", {}),
+        }
+        train_detection(model, train_ds, val_dataset=val_ds, config=training_config)
 
     elif model_name in ["unet", "attention_unet"]:
         image_dir = data_config.get(

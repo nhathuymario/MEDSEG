@@ -1,8 +1,9 @@
-"""Detection evaluation metrics: mAP, IoU."""
+"""Metric đánh giá detection: IoU và mAP."""
 import numpy as np
 
 
 def compute_iou(box1, box2):
+    """Tính Intersection over Union cho hai bbox [x1, y1, x2, y2]."""
     x1 = max(box1[0], box2[0])
     y1 = max(box1[1], box2[1])
     x2 = min(box1[2], box2[2])
@@ -14,7 +15,7 @@ def compute_iou(box1, box2):
 
 
 def compute_ap(precisions, recalls):
-    """Compute Average Precision using 11-point interpolation."""
+    """Tính Average Precision bằng nội suy 11 điểm."""
     ap = 0
     for t in np.arange(0, 1.1, 0.1):
         prec_at_rec = [p for p, r in zip(precisions, recalls) if r >= t]
@@ -23,7 +24,8 @@ def compute_ap(precisions, recalls):
 
 
 def compute_map(predictions, ground_truths, iou_threshold=0.5):
-    """Compute mAP@iou_threshold.
+    """Tính mAP tại một ngưỡng IoU.
+
     predictions: list of {'boxes': [[x1,y1,x2,y2]], 'scores': [float]}
     ground_truths: list of {'boxes': [[x1,y1,x2,y2]]}
     """
@@ -32,6 +34,7 @@ def compute_map(predictions, ground_truths, iou_threshold=0.5):
 
     for pred, gt in zip(predictions, ground_truths):
         gt_matched = [False] * len(gt["boxes"])
+        # Xét prediction theo score giảm dần như quy trình tính AP chuẩn.
         sorted_idx = np.argsort(-np.array(pred.get("scores", [])))
 
         for i in sorted_idx:

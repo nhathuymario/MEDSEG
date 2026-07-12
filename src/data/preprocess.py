@@ -1,4 +1,4 @@
-"""Preprocessing: resize, normalize, generate bboxes from masks."""
+"""Tiền xử lý dữ liệu: resize ảnh/mask và sinh bbox từ mask."""
 import argparse
 import cv2
 import numpy as np
@@ -7,6 +7,7 @@ from tqdm import tqdm
 
 
 def resize_and_save(src_dir: Path, dst_dir: Path, size=(256, 256), ext="*.jpg"):
+    """Resize toàn bộ ảnh trong src_dir rồi lưu sang dst_dir."""
     dst_dir.mkdir(parents=True, exist_ok=True)
     for img_path in tqdm(sorted(src_dir.glob(ext))):
         img = cv2.imread(str(img_path))
@@ -15,6 +16,7 @@ def resize_and_save(src_dir: Path, dst_dir: Path, size=(256, 256), ext="*.jpg"):
 
 
 def mask_to_binary(mask_dir: Path, out_dir: Path, size=(256, 256)):
+    """Resize mask grayscale và ngưỡng hóa thành mask nhị phân 0/255."""
     out_dir.mkdir(parents=True, exist_ok=True)
     for p in tqdm(sorted(mask_dir.glob("*.png"))):
         m = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)
@@ -24,9 +26,10 @@ def mask_to_binary(mask_dir: Path, out_dir: Path, size=(256, 256)):
 
 
 def mask_to_bbox(mask: np.ndarray) -> list:
-    """Extract bounding box [x1, y1, x2, y2] from binary mask."""
+    """Trích bounding box [x1, y1, x2, y2] từ mask nhị phân."""
     coords = np.where(mask > 0)
     if len(coords[0]) == 0:
+        # Faster R-CNN không nhận bbox rỗng, nên trả về bbox tối thiểu.
         return [0, 0, 1, 1]
     return [
         int(coords[1].min()),
@@ -37,12 +40,13 @@ def mask_to_bbox(mask: np.ndarray) -> list:
 
 
 def generate_coco_annotations(image_dir: Path, mask_dir: Path, output_path: Path):
-    """Generate COCO-format JSON annotations from masks."""
+    """Sinh file annotation COCO JSON từ mask segmentation."""
     import json
 
     images, annotations = [], []
     ann_id = 1
     for idx, img_path in enumerate(sorted(image_dir.glob("*.*"))):
+        # Quy ước mask của ISIC thường là <image_stem>_segmentation.png.
         mask_name = img_path.stem + "_segmentation.png"
         mask_path = mask_dir / mask_name
         if not mask_path.exists():
@@ -68,7 +72,7 @@ def prepare_chest_xray(
     output_dir: Path = Path("data/processed/chest_xray"),
     size=(256, 256),
 ):
-    """Prepare Montgomery X-rays and combine left/right lung masks."""
+    """Chuẩn bị dataset Montgomery X-ray và gộp mask phổi trái/phải."""
     image_dir = raw_dir / "CXR_png"
     left_mask_dir = raw_dir / "ManualMask" / "leftMask"
     right_mask_dir = raw_dir / "ManualMask" / "rightMask"
@@ -103,11 +107,13 @@ def prepare_chest_xray(
             raise ValueError(f"Could not read image or masks for {image_path.name}")
 
         image = cv2.resize(image, size, interpolation=cv2.INTER_AREA)
+        # CLAHE tăng tương phản cục bộ, hữu ích với ảnh X-quang grayscale.
         image = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(image)
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
 
         left_mask = cv2.resize(left_mask, size, interpolation=cv2.INTER_NEAREST)
         right_mask = cv2.resize(right_mask, size, interpolation=cv2.INTER_NEAREST)
+        # Gộp hai mask phổi thành một mask foreground duy nhất.
         combined_mask = ((left_mask > 127) | (right_mask > 127)).astype(
             np.uint8
         ) * 255

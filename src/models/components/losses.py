@@ -1,15 +1,18 @@
-"""Segmentation loss functions."""
+"""Các hàm loss cho bài toán segmentation nhị phân."""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
 class DiceLoss(nn.Module):
+    """Loss dựa trên Dice score, phù hợp khi foreground/background mất cân bằng."""
+
     def __init__(self, smooth=1.0):
         super().__init__()
         self.smooth = smooth
 
     def forward(self, pred, target):
+        # pred là logits từ model nên cần sigmoid trước khi tính Dice.
         pred = torch.sigmoid(pred)
         pred_flat = pred.view(-1)
         target_flat = target.view(-1)
@@ -18,6 +21,8 @@ class DiceLoss(nn.Module):
 
 
 class DiceBCELoss(nn.Module):
+    """Kết hợp BCEWithLogits và DiceLoss để học ổn định hơn."""
+
     def __init__(self, smooth=1.0):
         super().__init__()
         self.dice = DiceLoss(smooth)
@@ -27,6 +32,8 @@ class DiceBCELoss(nn.Module):
 
 
 class FocalLoss(nn.Module):
+    """Focal loss giảm trọng số pixel dễ, tập trung vào pixel khó."""
+
     def __init__(self, alpha=0.25, gamma=2.0):
         super().__init__()
         self.alpha, self.gamma = alpha, gamma
@@ -38,6 +45,8 @@ class FocalLoss(nn.Module):
 
 
 class TverskyLoss(nn.Module):
+    """Tversky loss cho phép cân bằng phạt false positive và false negative."""
+
     def __init__(self, alpha=0.7, beta=0.3, smooth=1.0):
         super().__init__()
         self.alpha, self.beta, self.smooth = alpha, beta, smooth

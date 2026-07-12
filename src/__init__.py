@@ -1,1 +1,1 @@
-# MedSeg Data Module
+"""Gói nguồn chính của MedSeg."""

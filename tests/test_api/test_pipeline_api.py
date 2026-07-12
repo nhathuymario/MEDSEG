@@ -16,6 +16,9 @@ def test_pipeline_endpoint():
             files={"file": ("test.png", img_bytes, "image/png")}
         )
     
-    assert response.status_code == 503
+    assert response.status_code == 200
     data = response.json()
-    assert "ISIC segmentation checkpoint has not been trained/loaded" in data["detail"]
+    assert "detection" in data
+    assert "segmentation_masks" in data
+    assert data["combined_overlay_base64"]
+    assert data["total_time_ms"] >= 0

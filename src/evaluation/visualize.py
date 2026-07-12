@@ -1,9 +1,10 @@
-"""Visualization: overlay bboxes and masks on images."""
+"""Hàm trực quan hóa bbox và mask trên ảnh."""
 import cv2
 import numpy as np
 
 
 def draw_boxes(image, boxes, scores=None, color=(0, 255, 0), thickness=2):
+    """Vẽ bbox, tùy chọn kèm confidence score."""
     img = image.copy()
     for i, box in enumerate(boxes):
         x1, y1, x2, y2 = map(int, box)
@@ -14,6 +15,7 @@ def draw_boxes(image, boxes, scores=None, color=(0, 255, 0), thickness=2):
 
 
 def overlay_mask(image, mask, color=(0, 128, 255), alpha=0.4):
+    """Phủ mask bán trong suốt lên ảnh gốc."""
     img = image.copy()
     colored = np.zeros_like(img)
     colored[mask > 0.5] = color
@@ -21,6 +23,7 @@ def overlay_mask(image, mask, color=(0, 128, 255), alpha=0.4):
 
 
 def side_by_side(image, mask_pred, mask_gt=None, size=(512, 512)):
+    """Ghép ảnh gốc, mask dự đoán và tùy chọn mask ground truth để so sánh."""
     img = cv2.resize(image, size)
     pred_overlay = overlay_mask(img, cv2.resize(mask_pred, size))
     panels = [img, pred_overlay]

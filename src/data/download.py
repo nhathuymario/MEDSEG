@@ -1,4 +1,4 @@
-"""Dataset download utilities."""
+"""Tiện ích tải dataset cho dự án MedSeg."""
 import argparse
 import re
 import socket
@@ -21,6 +21,8 @@ NLM_CXR_BASE_URL = (
 
 
 class _LinkParser(HTMLParser):
+    """Parser nhỏ để lấy toàn bộ href trong trang index.html của NLM."""
+
     def __init__(self):
         super().__init__()
         self.links = []
@@ -33,6 +35,7 @@ class _LinkParser(HTMLParser):
 
 
 def _is_valid_zip(path: Path) -> bool:
+    """Kiểm tra file ZIP đã tải có tồn tại và không bị lỗi."""
     if not path.exists():
         return False
     try:
@@ -43,6 +46,7 @@ def _is_valid_zip(path: Path) -> bool:
 
 
 def _remote_size(url: str) -> int | None:
+    """Lấy kích thước file từ header HTTP nếu server cung cấp."""
     request = urllib.request.Request(url, method="HEAD")
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
@@ -59,6 +63,7 @@ def _download_file(
     validate_zip: bool = False,
     show_progress: bool = True,
 ):
+    """Tải file có hỗ trợ resume, retry và tùy chọn kiểm tra ZIP."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     if validate_zip and _is_valid_zip(dest):
         print(f"[skip] {dest} is already downloaded")
@@ -79,6 +84,7 @@ def _download_file(
     while True:
         request = urllib.request.Request(url)
         if downloaded:
+            # Header Range cho phép tải tiếp phần còn thiếu nếu kết nối bị ngắt.
             request.add_header("Range", f"bytes={downloaded}-")
 
         try:
@@ -144,13 +150,14 @@ def _download(url: str, dest: Path, retries: int = 10):
 
 
 def _extract_zip(zip_path: Path, extract_to: Path):
+    """Giải nén ZIP vào thư mục đích."""
     print(f"Extracting {zip_path} -> {extract_to}")
     with zipfile.ZipFile(zip_path, "r") as z:
         z.extractall(extract_to)
 
 
 def download_isic2018(base_dir: Path = RAW_DIR / "isic2018"):
-    """Download ISIC 2018 Task 1 dataset (images + masks)."""
+    """Tải ISIC 2018 Task 1 gồm ảnh da liễu và mask segmentation."""
     base_dir.mkdir(parents=True, exist_ok=True)
     urls = {
         "images": "https://isic-challenge-data.s3.amazonaws.com/2018/ISIC2018_Task1-2_Training_Input.zip",
@@ -167,7 +174,7 @@ def download_chest_xray(
     base_dir: Path = RAW_DIR / "chest_xray",
     datasets=("montgomery", "shenzhen"),
 ):
-    """Download the official Montgomery and Shenzhen CXR datasets from NLM."""
+    """Tải dataset X-quang ngực Montgomery/Shenzhen từ NLM."""
     base_dir.mkdir(parents=True, exist_ok=True)
     roots = {
         "montgomery": urljoin(
@@ -223,6 +230,7 @@ def download_chest_xray(
 
 
 def _list_remote_files(root_url: str, local_root: Path):
+    """Duyệt cây thư mục public của NLM và trả về danh sách file cần tải."""
     jobs = []
     pending = [(root_url, local_root)]
     visited = set()

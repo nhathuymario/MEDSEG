@@ -1,4 +1,4 @@
-"""Training loop for U-Net / Attention U-Net segmentation."""
+"""Vòng lặp huấn luyện cho U-Net / Attention U-Net segmentation."""
 import csv
 import torch
 from pathlib import Path
@@ -8,12 +8,14 @@ from src.models.components.losses import DiceBCELoss
 
 
 def dice_score(pred, target, thresh=0.5):
+    """Tính Dice score trên batch sau khi ngưỡng hóa xác suất dự đoán."""
     pred = (torch.sigmoid(pred) > thresh).float()
     intersection = (pred * target).sum()
     return (2 * intersection + 1) / (pred.sum() + target.sum() + 1)
 
 
 def train_segmentation(model, train_dataset, val_dataset=None, config=None):
+    """Huấn luyện segmentation model và lưu checkpoint tốt nhất theo val Dice."""
     cfg = config or {}
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -36,6 +38,7 @@ def train_segmentation(model, train_dataset, val_dataset=None, config=None):
     )
     use_amp = cfg.get("mixed_precision", True) and device.type == "cuda"
 
+    # DataLoader cho segmentation trả về batch tensor ảnh và mask.
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -54,6 +57,7 @@ def train_segmentation(model, train_dataset, val_dataset=None, config=None):
 
     criterion = DiceBCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    # CosineAnnealingLR giảm learning rate mượt theo số epoch.
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
@@ -80,6 +84,7 @@ def train_segmentation(model, train_dataset, val_dataset=None, config=None):
             imgs, masks = imgs.to(device), masks.to(device)
 
             optimizer.zero_grad()
+            # AMP chỉ bật khi dùng CUDA để tiết kiệm VRAM và tăng tốc train.
             with torch.amp.autocast("cuda", enabled=use_amp):
                 pred = model(imgs)
                 loss = criterion(pred, masks)
@@ -97,7 +102,7 @@ def train_segmentation(model, train_dataset, val_dataset=None, config=None):
         current_lr = scheduler.get_last_lr()[0]
         print(f"Epoch {epoch+1}: loss={train_loss:.4f}, dice={train_dice:.4f}")
 
-        # Validation
+        # Validation: không cập nhật gradient, chỉ tính loss và Dice.
         val_loss = None
         val_dice = None
         if val_loader:

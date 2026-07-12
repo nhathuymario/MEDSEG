@@ -1,6 +1,7 @@
 """Main evaluation script."""
 import argparse
 import csv
+import json
 import sys
 import yaml
 import torch
@@ -24,9 +25,31 @@ from src.evaluation.metrics_segmentation import compute_segmentation_metrics
 
 
 def _read_split(split_dir, split_name):
+    if split_name == "all":
+        files = []
+        seen = set()
+        for name in ("train", "val", "test"):
+            for filename in _read_split(split_dir, name):
+                if filename not in seen:
+                    files.append(filename)
+                    seen.add(filename)
+        return files
     split_path = Path(split_dir) / f"{split_name}.csv"
     with open(split_path, newline="") as handle:
         return [row["filename"] for row in csv.DictReader(handle)]
+
+
+def _describe(values, seed=42, bootstrap_samples=2000):
+    values = np.asarray(values, dtype=np.float64)
+    if values.size == 0:
+        return {"mean": 0.0, "std": 0.0, "median": 0.0, "p95": 0.0, "ci95_mean": [0.0, 0.0]}
+    rng = np.random.default_rng(seed)
+    means = np.mean(rng.choice(values, size=(bootstrap_samples, values.size), replace=True), axis=1)
+    return {
+        "mean": float(np.mean(values)), "std": float(np.std(values)),
+        "median": float(np.median(values)), "p95": float(np.percentile(values, 95)),
+        "ci95_mean": [float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))],
+    }
 
 
 def _mask_to_box(mask_path: Path):
@@ -87,9 +110,25 @@ def main():
     parser.add_argument("--model", required=True, choices=["detection", "segmentation"])
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--config", help="Training config used for the model")
-    parser.add_argument("--split", default="test", choices=["train", "val", "test"])
+    parser.add_argument(
+        "--split",
+        default="test",
+        choices=["train", "val", "test", "all"],
+        help="Dataset split. 'all' is diagnostic only because it includes training data.",
+    )
+    parser.add_argument(
+        "--max-images",
+        type=int,
+        help="Evaluate only the first N images from the selected split.",
+    )
     parser.add_argument("--output-csv", help="Save per-image metrics to this CSV path")
+    parser.add_argument(
+        "--output-summary",
+        help="Save aggregate metrics to JSON. Defaults to <output-csv>.summary.json.",
+    )
     args = parser.parse_args()
+    if args.max_images is not None and args.max_images < 1:
+        parser.error("--max-images must be at least 1")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Evaluating {args.model} on {device}...")
@@ -124,6 +163,8 @@ def main():
         model.eval().to(device)
 
         files = _read_split(split_dir, args.split)
+        if args.max_images is not None:
+            files = files[: args.max_images]
         predictions = []
         ground_truths = []
         per_image_rows = []
@@ -168,6 +209,30 @@ def main():
         fn = sum(row["fn"] for row in per_image_rows)
         precision = tp / (tp + fp + 1e-6)
         recall = tp / (tp + fn + 1e-6)
+        best_ious = [row["best_iou"] for row in per_image_rows]
+        summary = {
+            "model": "detection",
+            "dataset": data_config.get("dataset", "isic2018"),
+            "split": args.split,
+            "evaluation_scope": "diagnostic_includes_training_data" if args.split == "all" else "holdout_split",
+            "num_images": len(files),
+            "checkpoint": args.checkpoint,
+            "csv": args.output_csv,
+            "confidence_threshold": confidence_threshold,
+            "iou_threshold": iou_threshold,
+            "map": float(map_50),
+            "precision": float(precision),
+            "recall": float(recall),
+            "tp": int(tp),
+            "fp": int(fp),
+            "fn": int(fn),
+            "best_iou_mean": float(np.mean(best_ious)) if best_ious else 0.0,
+            "best_iou_std": float(np.std(best_ious)) if best_ious else 0.0,
+            "per_image_statistics": {
+                "best_iou": _describe(best_ious),
+                "inference_time_ms": _describe([row["inference_time_ms"] for row in per_image_rows]),
+            },
+        }
         print(f"Evaluated {len(files)} images from the {args.split} split:")
         print(f"  mAP@{iou_threshold}: {map_50:.4f}")
         print(f"  precision@{confidence_threshold}: {precision:.4f}")
@@ -194,6 +259,19 @@ def main():
                 writer.writeheader()
                 writer.writerows(per_image_rows)
             print(f"Saved per-image metrics to {output_path}")
+
+        summary_path = (
+            Path(args.output_summary)
+            if args.output_summary
+            else Path(args.output_csv).with_suffix(".summary.json")
+            if args.output_csv
+            else None
+        )
+        if summary_path:
+            summary_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(summary_path, "w", encoding="utf-8") as handle:
+                json.dump(summary, handle, indent=2)
+            print(f"Saved summary metrics to {summary_path}")
     else:
         if not args.config:
             parser.error("--config is required for segmentation evaluation")
@@ -217,6 +295,8 @@ def main():
         data_config = config["data"]
         image_size = data_config.get("image_size", [256, 256])[0]
         files = _read_split(data_config["split_dir"], args.split)
+        if args.max_images is not None:
+            files = files[: args.max_images]
         dataset = SegmentationDataset(
             data_config["image_dir"],
             data_config["mask_dir"],
@@ -264,6 +344,36 @@ def main():
             np.concatenate(targets),
             threshold=config.get("evaluation", {}).get("threshold", 0.5),
         )
+        per_image_metric_names = [
+            "dice",
+            "iou",
+            "sensitivity",
+            "specificity",
+            "pixel_accuracy",
+        ]
+        summary = {
+            "model": "segmentation",
+            "dataset": data_config.get("dataset", "unknown"),
+            "split": args.split,
+            "evaluation_scope": "diagnostic_includes_training_data" if args.split == "all" else "holdout_split",
+            "num_images": len(dataset),
+            "checkpoint": args.checkpoint,
+            "csv": args.output_csv,
+            "threshold": config.get("evaluation", {}).get("threshold", 0.5),
+            "metrics": metrics,
+            "per_image_mean": {
+                name: float(np.mean([row[name] for row in per_image_rows]))
+                for name in per_image_metric_names
+            },
+            "per_image_std": {
+                name: float(np.std([row[name] for row in per_image_rows]))
+                for name in per_image_metric_names
+            },
+            "per_image_statistics": {
+                name: _describe([row[name] for row in per_image_rows])
+                for name in [*per_image_metric_names, "inference_time_ms"]
+            },
+        }
         print(f"Evaluated {len(dataset)} images from the {args.split} split:")
         for name, value in metrics.items():
             print(f"  {name}: {value:.4f}")
@@ -275,6 +385,10 @@ def main():
                 "filename",
                 "split",
                 "inference_time_ms",
+                "tp",
+                "fp",
+                "fn",
+                "tn",
                 "dice",
                 "iou",
                 "sensitivity",
@@ -286,6 +400,19 @@ def main():
                 writer.writeheader()
                 writer.writerows(per_image_rows)
             print(f"Saved per-image metrics to {output_path}")
+
+        summary_path = (
+            Path(args.output_summary)
+            if args.output_summary
+            else Path(args.output_csv).with_suffix(".summary.json")
+            if args.output_csv
+            else None
+        )
+        if summary_path:
+            summary_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(summary_path, "w", encoding="utf-8") as handle:
+                json.dump(summary, handle, indent=2)
+            print(f"Saved summary metrics to {summary_path}")
 
 
 if __name__ == "__main__":

@@ -1,9 +1,14 @@
-"""Medical image augmentations using Albumentations."""
+"""Các phép biến đổi/augmentation ảnh y khoa bằng Albumentations.
+
+Train transforms có augmentation để tăng đa dạng dữ liệu; validation transforms
+chỉ resize + normalize để đánh giá ổn định.
+"""
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
 
 def get_train_transforms(size=256):
+    """Augmentation tổng quát cho segmentation dataset."""
     return A.Compose([
         A.Resize(size, size),
         A.HorizontalFlip(p=0.5),
@@ -24,6 +29,7 @@ def get_train_transforms(size=256):
 
 
 def get_val_transforms(size=256):
+    """Transform tối thiểu cho validation/test segmentation."""
     return A.Compose([
         A.Resize(size, size),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
@@ -32,7 +38,10 @@ def get_val_transforms(size=256):
 
 
 def get_chest_xray_train_transforms(size=256):
-    """Conservative augmentation for frontal chest radiographs."""
+    """Augmentation nhẹ cho X-quang ngực thẳng.
+
+    Không dùng vertical flip/rotate mạnh vì có thể tạo ảnh giải phẫu không thực tế.
+    """
     return A.Compose([
         A.Resize(size, size),
         A.HorizontalFlip(p=0.5),
@@ -44,7 +53,7 @@ def get_chest_xray_train_transforms(size=256):
 
 
 def get_detection_transforms(size=512, train=True):
-    """Transforms for detection (with bbox support)."""
+    """Transform cho Faster R-CNN, có khai báo bbox_params để sửa tọa độ bbox."""
     if train:
         return A.Compose([
             A.Resize(size, size),

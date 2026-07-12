@@ -1,18 +1,21 @@
-"""Train/val/test split utilities."""
+"""Tiện ích chia dữ liệu thành train/val/test."""
 import pandas as pd
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 
-# Chia dữ liệu thành các tập train, val, test theo tỷ lệ 70%, 15%, 15%
-# Seed được đặt để đảm bảo kết quả có thể tái tạo
+
 def create_splits(image_dir: Path, output_dir: Path, train=0.7, val=0.15, seed=42):
-    """Create stratified splits and save as CSVs."""
+    """Chia file ảnh thành CSV train/val/test.
+
+    Mặc định tỉ lệ là 70% train, 15% validation, 15% test. random_state giúp
+    lần chạy sau tạo ra cùng kết quả nếu danh sách file không đổi.
+    """
     output_dir.mkdir(parents=True, exist_ok=True)
-    # Lấy toàn bộ tên file ảnh trong data\processed\images
-    # Sắp xếp tên file bằng sorted() để đảm bảo thứ tự nhất quán
+    # Lấy toàn bộ tên file ảnh và sort để thứ tự đầu vào luôn ổn định.
     files = sorted([f.name for f in image_dir.iterdir() if f.is_file()])
 
     train_files, temp = train_test_split(files, train_size=train, random_state=seed)
+    # temp còn lại gồm val + test; val_ratio là tỉ lệ val bên trong phần temp.
     val_ratio = val / (1 - train)
     val_files, test_files = train_test_split(temp, train_size=val_ratio, random_state=seed)
 
