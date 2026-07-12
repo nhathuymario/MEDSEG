@@ -1,5 +1,5 @@
 /**
- * MedSeg API Client - Concise wrapper for all backend calls.
+ * MedSeg API client.
  */
 const BASE = 'http://localhost:8000/api';
 
@@ -23,9 +23,21 @@ async function get(endpoint) {
   return res.json();
 }
 
+async function postJson(endpoint) {
+  const res = await fetch(`${BASE}${endpoint}`, { method: 'POST' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail || `Lỗi API: ${res.status}`);
+  }
+  return res.json();
+}
+
 export const api = {
   health: () => get('/health'),
   detect: (file) => post('/detect', file),
   segment: (file) => post('/segment', file),
   pipeline: (file) => post('/pipeline', file),
+  metrics: () => get('/metrics'),
+  evaluationStatus: () => get('/metrics/evaluation-status'),
+  runEvaluation: (kind, limit) => postJson(`/metrics/evaluate/${kind}?limit=${limit}`),
 };

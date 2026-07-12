@@ -213,6 +213,8 @@ body {
 
 /* Metrics */
 .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.training-history-scroll { max-height: 430px; overflow-y: auto; }
+.training-history-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--surface, white); }
 
 .metric-card {
   background: var(--bg-secondary);
