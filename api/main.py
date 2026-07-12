@@ -2,7 +2,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routers import detection, segmentation, pipeline, health
+from api.routers import detection, segmentation, pipeline, health, metrics
 from api.services.model_service import model_service
 
 
@@ -25,3 +25,4 @@ app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(detection.router, prefix="/api", tags=["Detection"])
 app.include_router(segmentation.router, prefix="/api", tags=["Segmentation"])
 app.include_router(pipeline.router, prefix="/api", tags=["Pipeline"])
+app.include_router(metrics.router, prefix="/api", tags=["Metrics"])

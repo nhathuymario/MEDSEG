@@ -8,16 +8,17 @@ data:
   dataset: isic2018
   image_dir: data/processed/isic2018/images
   annotation_file: data/processed/isic2018/annotations/train.json
+  split_dir: data/splits/isic2018
   image_size: [512, 512]
   batch_size: 4
   num_workers: 4
 
 training:
-  epochs: 50
+  epochs: 80
   lr: 0.001
   weight_decay: 0.0005
   lr_scheduler: step
-  step_size: 15
+  step_size: 20
 
 evaluation:
   iou_threshold: 0.5

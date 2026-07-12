@@ -20,7 +20,7 @@
 
 Đề tài xây dựng hệ thống MedSeg nhằm hỗ trợ phân tích ảnh y tế bằng học sâu. Hệ thống tập trung vào hai nhóm bài toán chính: phát hiện tổn thương da trên bộ dữ liệu ISIC 2018 bằng Faster R-CNN và phân đoạn vùng tổn thương hoặc vùng phổi bằng U-Net/Attention U-Net. Ngoài phần huấn luyện và đánh giá mô hình, đề tài còn triển khai backend FastAPI và frontend React để người dùng có thể tải ảnh, chọn workflow phân tích, xem kết quả overlay và theo dõi các chỉ số đánh giá.
 
-Kết quả thực nghiệm cho thấy mô hình phân đoạn phổi X-quang đạt Dice 0.9811 và IoU 0.9628 trên tập test Montgomery CXR. Với ảnh da liễu ISIC 2018, mô hình phân đoạn tổn thương đạt Dice 0.8847 và IoU 0.7932 trên 390 ảnh test. Mô hình phát hiện tổn thương da Faster R-CNN đạt mAP@0.5 là 0.7142, Precision@0.5 là 0.8768 và Recall@0.5 là 0.7846.
+Kết quả thực nghiệm cho thấy mô hình phân đoạn phổi X-quang đạt Dice 0.9811 và IoU 0.9628 trên tập test Montgomery CXR. Với ảnh da liễu ISIC 2018, mô hình phân đoạn tổn thương đạt Dice 0.8908 và IoU 0.8032 trên 390 ảnh test. Mô hình phát hiện tổn thương da Faster R-CNN đạt mAP@0.5 là 0.7167, Precision@0.5 là 0.9465 và Recall@0.5 là 0.7718. Khi tích hợp Detection → ROI Segmentation, full pipeline đạt global Dice 0.7659, success rate 80.26% và latency trung bình 110.6 ms/ảnh trên cùng test split.
 
 ---
 
@@ -253,11 +253,11 @@ CSV per-image: `outputs/metrics/isic2018_test_per_image.csv`
 
 | Chỉ số | Giá trị toàn test | Mean per-image | Std per-image |
 |---|---:|---:|---:|
-| Dice | 0.8847 | 0.8707 | 0.1443 |
-| IoU | 0.7932 | 0.7927 | 0.1728 |
-| Sensitivity | 0.8611 | 0.9135 | 0.1495 |
-| Specificity | 0.9774 | 0.9757 | 0.0377 |
-| Pixel Accuracy | 0.9532 | 0.9532 | 0.0741 |
+| Dice | 0.8908 | 0.8833 | 0.1480 |
+| IoU | 0.8032 | 0.8134 | 0.1726 |
+| Sensitivity | 0.8717 | 0.9039 | 0.1500 |
+| Specificity | 0.9775 | 0.9740 | 0.0529 |
+| Pixel Accuracy | 0.9554 | 0.9554 | 0.0720 |
 
 ### 7.3 Phát hiện tổn thương da ISIC
 
@@ -268,14 +268,14 @@ CSV per-image: `outputs/metrics/isic2018_detection_test_per_image.csv`
 
 | Chỉ số | Giá trị |
 |---|---:|
-| mAP@0.5 | 0.7142 |
-| Precision@0.5 | 0.8768 |
-| Recall@0.5 | 0.7846 |
-| TP | 306 |
-| FP | 43 |
-| FN | 84 |
-| Best IoU mean | 0.6879 |
-| Best IoU std | 0.3365 |
+| mAP@0.5 | 0.7167 |
+| Precision@0.5 | 0.9465 |
+| Recall@0.5 | 0.7718 |
+| TP | 301 |
+| FP | 17 |
+| FN | 89 |
+| Best IoU mean | 0.6590 |
+| Best IoU std | 0.3544 |
 
 ### 7.4 Lệnh đánh giá
 
@@ -311,6 +311,54 @@ ISIC detection:
   --split test `
   --output-csv outputs\metrics\isic2018_detection_test_per_image.csv
 ```
+
+### 7.5 Đánh giá full pipeline ở mức tích hợp
+
+Full pipeline được đánh giá end-to-end theo đúng luồng triển khai: Faster R-CNN phát hiện ROI, Attention U-Net phân đoạn từng ROI, sau đó ghép mask về kích thước ảnh gốc. Pipeline được chạy trên toàn bộ 390 ảnh test ISIC; ảnh detector bỏ sót vẫn được tính là thất bại thay vì bị loại khỏi mẫu đánh giá.
+
+| Tiêu chí | Kết quả |
+|---|---:|
+| Ảnh có ít nhất một detection | 313 / 390 |
+| Success rate | 80.26% |
+| Ảnh không có detection | 77 |
+| Global Dice | 0.7659 |
+| Global IoU | 0.6206 |
+| Sensitivity | 0.6421 |
+| Specificity | 0.9909 |
+| Pixel Accuracy | 0.9181 |
+| Mean Dice per-image | 0.7157 |
+| 95% CI của mean Dice | [0.6769, 0.7510] |
+| Latency trung bình | 110.6 ms/ảnh |
+| Latency median / P95 | 113.3 / 117.2 ms |
+
+Kết quả model-level của segmentor (Dice 0.8908) cao hơn full pipeline (Dice 0.7659). Mức giảm này phản ánh lỗi lan truyền: detector bỏ sót ROI khiến pipeline không có mask, dù segmentor độc lập có thể phân đoạn tốt trên toàn ảnh.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\evaluate_pipeline.py `
+  --detection-checkpoint outputs\checkpoints\best_detection.pth `
+  --segmentation-checkpoint outputs\checkpoints\best_segmentation.pth `
+  --split test `
+  --output-csv outputs\metrics\isic2018_pipeline_test_per_image.csv
+```
+
+### 7.6 Baseline và benchmark protocol
+
+Baseline được thiết kế là U-Net chuẩn, giữ nguyên ISIC split, kích thước đầu vào 256×256, loss Dice+BCE, optimizer Adam, learning rate và số epoch như Attention U-Net. Cấu hình nằm tại `configs/segmentation_unet_baseline_config.yaml`. Hiện chưa có checkpoint U-Net baseline nên báo cáo không đưa ra số so sánh giả.
+
+```powershell
+# Train baseline
+.\.venv\Scripts\python.exe scripts\train.py --config configs\segmentation_unet_baseline_config.yaml
+
+# Đánh giá baseline trên đúng test split
+.\.venv\Scripts\python.exe scripts\evaluate.py `
+  --model segmentation `
+  --config configs\segmentation_unet_baseline_config.yaml `
+  --checkpoint outputs\checkpoints\best_segmentation_unet_baseline.pth `
+  --split test `
+  --output-csv outputs\metrics\isic2018_unet_baseline_test_per_image.csv
+```
+
+Chỉ được kết luận mô hình tốt hơn baseline sau khi cả hai được đánh giá trên cùng 390 ảnh và cùng preprocessing. So sánh với bài báo/leaderboard bên ngoài phải ghi rõ protocol và split khác nhau; các số không cùng protocol chỉ mang tính tham khảo.
 
 ---
 
@@ -421,4 +469,3 @@ http://localhost:5173
 | `frontend` | Frontend React |
 | `outputs/checkpoints` | Checkpoint model đã train |
 | `outputs/metrics` | CSV kết quả đánh giá per-image |
-
