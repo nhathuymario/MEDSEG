@@ -3,8 +3,8 @@ import { api } from '../api/client';
 
 const MODEL_INFO = {
   detector: {
-    label: 'Phát hiện tổn thương da ISIC',
-    detail: 'Faster R-CNN',
+    label: 'Phát hiện tổn thương da Clinical + ISIC',
+    detail: 'Faster R-CNN đa miền',
   },
   isic_segmentor: {
     label: 'Phân đoạn tổn thương da ISIC',

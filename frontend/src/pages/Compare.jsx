@@ -42,6 +42,7 @@ export default function Compare() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef();
 
   useEffect(() => {
@@ -63,6 +64,12 @@ export default function Compare() {
     setPreview(URL.createObjectURL(f));
     setResult(null);
     setError(null);
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    setDragOver(false);
+    handleFile(event.dataTransfer.files[0]);
   };
 
   const runCompare = async () => {
@@ -93,7 +100,14 @@ export default function Compare() {
         </p>
       </div>
 
-      <div className="upload-zone" onClick={() => inputRef.current.click()} style={{ marginBottom: 16 }}>
+      <div
+        className={`upload-zone ${dragOver ? 'dragover' : ''}`}
+        onClick={() => inputRef.current.click()}
+        onDragOver={(event) => { event.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        style={{ marginBottom: 16 }}
+      >
         <div className="icon">Tệp</div>
         <p><strong>Bấm để chọn</strong> ảnh da liễu ISIC cần so sánh</p>
         <p style={{ fontSize: '0.8rem', marginTop: 4 }}>Hỗ trợ JPEG, PNG</p>
@@ -114,17 +128,17 @@ export default function Compare() {
 
           {error && <div className="error-msg">{error}</div>}
 
-          <div className="results-panel">
+          <div className="results-panel compare-grid">
             <div className="card">
               <h3 style={{ marginBottom: 12 }}>Ảnh gốc</h3>
-              <ImageViewer src={preview} />
+              <ImageViewer src={preview} showOpacity={false} variant="compact" />
             </div>
 
             <div className="card">
               <h3 style={{ marginBottom: 12 }}>Phát hiện tổn thương</h3>
               {result?.detect ? (
                 <>
-                  <ImageViewer src={`data:image/png;base64,${result.detect.overlay_base64}`} />
+                  <ImageViewer src={`data:image/png;base64,${result.detect.overlay_base64}`} variant="compact" />
                   <div className="metrics-grid" style={{ marginTop: 12 }}>
                     <div className="metric-card">
                       <div className="metric-value good">{result.detect.inference_time_ms?.toFixed(0)}ms</div>
@@ -145,7 +159,7 @@ export default function Compare() {
               <h3 style={{ marginBottom: 12 }}>Pipeline ISIC đầy đủ</h3>
               {result?.pipeline ? (
                 <>
-                  <ImageViewer src={`data:image/png;base64,${result.pipeline.combined_overlay_base64}`} />
+                  <ImageViewer src={`data:image/png;base64,${result.pipeline.combined_overlay_base64}`} variant="compact" />
                   <div className="metrics-grid" style={{ marginTop: 12 }}>
                     <div className="metric-card">
                       <div className="metric-value good">{result.pipeline.total_time_ms?.toFixed(0)}ms</div>
@@ -162,6 +176,33 @@ export default function Compare() {
               )}
             </div>
           </div>
+
+          {result && (
+            <div className="card" style={{ marginTop: 16 }}>
+              <h3 style={{ marginBottom: 12 }}>Đối chiếu định lượng trên cùng ảnh</h3>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>Workflow</th><th>Số vùng</th><th>Confidence cao nhất</th><th>Thời gian</th><th>Đầu ra</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td>Faster R-CNN</td>
+                      <td>{result.detect.boxes?.length || 0}</td>
+                      <td>{result.detect.scores?.length ? `${(Math.max(...result.detect.scores) * 100).toFixed(1)}%` : '-'}</td>
+                      <td>{result.detect.inference_time_ms?.toFixed(0)} ms</td>
+                      <td>Bounding box</td>
+                    </tr>
+                    <tr>
+                      <td>Full pipeline</td>
+                      <td>{result.pipeline.detection?.boxes?.length || 0}</td>
+                      <td>{result.pipeline.detection?.scores?.length ? `${(Math.max(...result.pipeline.detection.scores) * 100).toFixed(1)}%` : '-'}</td>
+                      <td>{result.pipeline.total_time_ms?.toFixed(0)} ms</td>
+                      <td>Bounding box + mask</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
 

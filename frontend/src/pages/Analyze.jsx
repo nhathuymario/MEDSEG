@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAnalysis } from '../hooks/useAnalysis';
 import ImageViewer from '../components/ImageViewer';
@@ -7,8 +8,8 @@ import ResultPanel from '../components/ResultPanel';
 const MODES = [
   {
     id: 'detect',
-    title: 'Phát hiện tổn thương da',
-    description: 'ISIC Faster R-CNN',
+    title: 'Phát hiện tổn thương da đa miền',
+    description: 'Faster R-CNN · ảnh clinical + dermoscopic',
     requiredModels: ['detector'],
   },
   {
@@ -19,20 +20,22 @@ const MODES = [
   },
   {
     id: 'pipeline',
-    title: 'Pipeline ISIC đầy đủ',
-    description: 'Phát hiện + phân đoạn tổn thương da',
+    title: 'Full pipeline tổn thương da',
+    description: 'Phát hiện vùng tổn thương + phân đoạn mask',
     requiredModels: ['detector', 'isic_segmentor'],
   },
 ];
 
 export default function Analyze() {
+  const { mode: routeMode } = useParams();
+  const mode = MODES.some((item) => item.id === routeMode) ? routeMode : 'detect';
+  const activeMode = MODES.find((item) => item.id === mode) || MODES[0];
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [mode, setMode] = useState('detect');
   const [dragOver, setDragOver] = useState(false);
   const [health, setHealth] = useState(null);
   const inputRef = useRef();
-  const { analyze, result, loading, error } = useAnalysis();
+  const { analyze, result, loading, error, setResult } = useAnalysis();
 
   useEffect(() => {
     api.health()
@@ -40,31 +43,33 @@ export default function Analyze() {
       .catch(() => setHealth({ status: 'offline', models_loaded: [] }));
   }, []);
 
+  useEffect(() => {
+    setResult(null);
+  }, [mode, setResult]);
+
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview);
+  }, [preview]);
+
   const loadedModels = useMemo(
     () => new Set(health?.models_loaded || []),
     [health],
   );
 
-  const modeStatuses = useMemo(() => {
-    return MODES.reduce((acc, item) => {
-      const missing = item.requiredModels.filter((name) => !loadedModels.has(name));
-      acc[item.id] = { ready: missing.length === 0, missing };
-      return acc;
-    }, {});
-  }, [loadedModels]);
+  const missingModels = activeMode.requiredModels.filter((name) => !loadedModels.has(name));
+  const selectedModeReady = missingModels.length === 0;
 
-  const selectedModeReady = modeStatuses[mode]?.ready ?? false;
-
-  const handleFile = (f) => {
-    if (!f) return;
-    setFile(f);
-    setPreview(URL.createObjectURL(f));
+  const handleFile = (nextFile) => {
+    if (!nextFile) return;
+    setFile(nextFile);
+    setPreview(URL.createObjectURL(nextFile));
+    setResult(null);
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
+  const handleDrop = (event) => {
+    event.preventDefault();
     setDragOver(false);
-    handleFile(e.dataTransfer.files[0]);
+    handleFile(event.dataTransfer.files[0]);
   };
 
   const handleSubmit = async () => {
@@ -83,45 +88,36 @@ export default function Analyze() {
 
   return (
     <div>
-      <h1 className="page-title">Phân tích ảnh y tế</h1>
+      <h1 className="page-title">{activeMode.title}</h1>
+
+      <div className="card function-summary">
+        <div>
+          <span className="function-kicker">Chức năng đang chọn</span>
+          <h3>{activeMode.title}</h3>
+          <p>{activeMode.description}</p>
+        </div>
+        <span className={`status-pill ${selectedModeReady ? 'ready' : 'pending'}`}>
+          {selectedModeReady ? 'sẵn sàng' : `thiếu: ${missingModels.join(', ')}`}
+        </span>
+      </div>
 
       <div
         className={`upload-zone ${dragOver ? 'dragover' : ''}`}
         onClick={() => inputRef.current.click()}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragOver={(event) => { event.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
       >
         <div className="icon">Tệp</div>
         <p><strong>Bấm để chọn</strong> hoặc kéo thả ảnh y tế vào đây</p>
-        <p style={{ fontSize: '0.8rem', marginTop: 4 }}>Hỗ trợ JPEG, PNG</p>
-        <input ref={inputRef} type="file" accept="image/*" hidden onChange={(e) => handleFile(e.target.files[0])} />
+        <p style={{ fontSize: '0.8rem', marginTop: 4 }}>Hỗ trợ JPEG, PNG và WebP</p>
+        <input ref={inputRef} type="file" accept="image/*" hidden onChange={(event) => handleFile(event.target.files[0])} />
       </div>
 
       {preview && (
         <>
-          <div className="model-selector">
-            {MODES.map((m) => {
-              const status = modeStatuses[m.id] || { ready: false, missing: m.requiredModels };
-              return (
-                <button
-                  key={m.id}
-                  className={`model-option ${mode === m.id ? 'selected' : ''} ${status.ready ? 'ready' : 'pending'}`}
-                  onClick={() => setMode(m.id)}
-                  disabled={!status.ready}
-                >
-                  <span className="model-title">{m.title}</span>
-                  <span className="model-meta">{m.description}</span>
-                  <span className={`status-pill ${status.ready ? 'ready' : 'pending'}`}>
-                    {status.ready ? 'sẵn sàng' : `thiếu: ${status.missing.join(', ')}`}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
           <button className="btn btn-primary" onClick={handleSubmit} disabled={loading || !selectedModeReady} style={{ marginBottom: 16 }}>
-            {loading ? <><span className="loading-spinner" /> Đang phân tích...</> : 'Chạy phân tích'}
+            {loading ? <><span className="loading-spinner" /> Đang phân tích...</> : `Chạy ${activeMode.title}`}
           </button>
 
           {error && <div className="error-msg">{error}</div>}
@@ -129,7 +125,7 @@ export default function Analyze() {
           <div className="results-panel">
             <div className="card">
               <h3 style={{ marginBottom: 12 }}>Ảnh gốc</h3>
-              <ImageViewer src={preview} />
+              <ImageViewer src={preview} showOpacity={false} />
             </div>
             {result && (
               <div className="card">
