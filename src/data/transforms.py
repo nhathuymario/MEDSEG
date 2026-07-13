@@ -4,13 +4,29 @@ Train transforms có augmentation để tăng đa dạng dữ liệu; validation
 chỉ resize + normalize để đánh giá ổn định.
 """
 import albumentations as A
+import cv2
 from albumentations.pytorch import ToTensorV2
+
+
+def _resize_with_padding(size):
+    """Keep aspect ratio and pad instead of stretching every image square."""
+    return [
+        A.LongestMaxSize(max_size=size),
+        A.PadIfNeeded(
+            min_height=size,
+            min_width=size,
+            position="center",
+            border_mode=cv2.BORDER_CONSTANT,
+            fill=(123, 116, 103),
+            fill_mask=0,
+        ),
+    ]
 
 
 def get_train_transforms(size=256):
     """Augmentation tổng quát cho segmentation dataset."""
     return A.Compose([
-        A.Resize(size, size),
+        *_resize_with_padding(size),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
         A.RandomRotate90(p=0.5),
@@ -31,7 +47,7 @@ def get_train_transforms(size=256):
 def get_val_transforms(size=256):
     """Transform tối thiểu cho validation/test segmentation."""
     return A.Compose([
-        A.Resize(size, size),
+        *_resize_with_padding(size),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
     ])
@@ -43,7 +59,7 @@ def get_chest_xray_train_transforms(size=256):
     Không dùng vertical flip/rotate mạnh vì có thể tạo ảnh giải phẫu không thực tế.
     """
     return A.Compose([
-        A.Resize(size, size),
+        *_resize_with_padding(size),
         A.HorizontalFlip(p=0.5),
         A.RandomBrightnessContrast(p=0.3),
         A.CLAHE(clip_limit=2.0, p=0.3),
@@ -56,14 +72,14 @@ def get_detection_transforms(size=512, train=True):
     """Transform cho Faster R-CNN, có khai báo bbox_params để sửa tọa độ bbox."""
     if train:
         return A.Compose([
-            A.Resize(size, size),
+            *_resize_with_padding(size),
             A.HorizontalFlip(p=0.5),
             A.RandomBrightnessContrast(p=0.3),
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ToTensorV2(),
         ], bbox_params=A.BboxParams(format="pascal_voc", label_fields=["labels"]))
     return A.Compose([
-        A.Resize(size, size),
+        *_resize_with_padding(size),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
     ], bbox_params=A.BboxParams(format="pascal_voc", label_fields=["labels"]))

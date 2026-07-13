@@ -43,8 +43,13 @@ class DetectionDataset(Dataset):
         img_id = self.img_ids[idx]
         img_info = self.images[img_id]
         img = cv2.imread(str(self.image_dir / img_info["file_name"]))
+        if img is None:
+            raise FileNotFoundError(
+                f"Detection image not found: {self.image_dir / img_info['file_name']}"
+            )
         # OpenCV đọc ảnh theo BGR, còn Albumentations/model thường dùng RGB.
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        image_height, image_width = img.shape[:2]
 
         anns = self.anns.get(img_id, [])
         boxes = []
@@ -52,7 +57,12 @@ class DetectionDataset(Dataset):
             x, y, w, h = a["bbox"]
             # COCO lưu bbox dạng [x, y, width, height].
             # Faster R-CNN của torchvision cần [x1, y1, x2, y2].
-            boxes.append([x, y, x + w, y + h])
+            x1 = min(max(float(x), 0.0), float(image_width))
+            y1 = min(max(float(y), 0.0), float(image_height))
+            x2 = min(max(float(x + w), 0.0), float(image_width))
+            y2 = min(max(float(y + h), 0.0), float(image_height))
+            if x2 > x1 and y2 > y1:
+                boxes.append([x1, y1, x2, y2])
 
         boxes = np.array(boxes, dtype=np.float32) if boxes else np.zeros((0, 4), dtype=np.float32)
         # Dự án hiện dùng 1 lớp foreground, nên label 1 là object cần phát hiện.

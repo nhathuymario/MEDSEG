@@ -32,17 +32,17 @@ def _confidence_interval(values, seed=42, samples=2000):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--detection-checkpoint", default="outputs/checkpoints/best_detection.pth")
-    parser.add_argument("--segmentation-checkpoint", default="outputs/checkpoints/best_segmentation.pth")
+    parser.add_argument("--detection-checkpoint", default="outputs/detection/checkpoints/best_detection.pth")
+    parser.add_argument("--segmentation-checkpoint", default="outputs/segmentation/skin/checkpoints/best_segmentation.pth")
     parser.add_argument("--image-dir", default="data/processed/isic2018/images")
     parser.add_argument("--mask-dir", default="data/processed/isic2018/masks")
     parser.add_argument("--split-dir", default="data/splits/isic2018")
     parser.add_argument("--split", default="test", choices=["train", "val", "test"])
     parser.add_argument("--max-images", type=int)
-    parser.add_argument("--detection-threshold", type=float, default=0.5)
-    parser.add_argument("--segmentation-threshold", type=float, default=0.5)
+    parser.add_argument("--detection-threshold", type=float, default=0.8)
+    parser.add_argument("--segmentation-threshold", type=float, default=0.8)
     parser.add_argument("--iou-threshold", type=float, default=0.5)
-    parser.add_argument("--output-csv", default="outputs/metrics/isic2018_pipeline_test_per_image.csv")
+    parser.add_argument("--output-csv", default="outputs/pipeline/metrics/isic2018_pipeline_test_per_image.csv")
     args = parser.parse_args()
     if args.max_images is not None and args.max_images < 1:
         parser.error("--max-images must be at least 1")
@@ -66,7 +66,11 @@ def main():
         target = (cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE) > 127).astype(np.uint8)
         result = pipeline.run(image, args.detection_threshold, args.segmentation_threshold)
         predicted = result["full_mask"]
-        metrics = compute_segmentation_metrics(predicted, target, threshold=0.5)
+        metrics = compute_segmentation_metrics(
+            predicted,
+            target,
+            threshold=args.segmentation_threshold,
+        )
         detection = _detection_counts(result["detection"]["boxes"], _mask_to_box(mask_path), args.iou_threshold)
         rows.append({
             "filename": filename,

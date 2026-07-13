@@ -147,7 +147,7 @@ def main():
                     "mask_dir": "data/processed/isic2018/masks",
                     "split_dir": "data/splits/isic2018",
                 },
-                "evaluation": {"confidence_threshold": 0.5, "iou_threshold": 0.5},
+                "evaluation": {"confidence_threshold": 0.8, "iou_threshold": 0.5},
             }
 
         data_config = config.get("data", {})
@@ -155,7 +155,22 @@ def main():
         image_dir = Path(data_config.get("image_dir", "data/processed/isic2018/images"))
         mask_dir = Path(data_config.get("mask_dir", "data/processed/isic2018/masks"))
         split_dir = Path(data_config.get("split_dir", "data/splits/isic2018"))
-        confidence_threshold = eval_config.get("confidence_threshold", 0.5)
+        annotation_file = data_config.get("annotation_file")
+        coco_boxes = None
+        if annotation_file:
+            with open(annotation_file, encoding="utf-8") as handle:
+                coco = json.load(handle)
+            filenames_by_id = {
+                item["id"]: item["file_name"] for item in coco["images"]
+            }
+            coco_boxes = {name: [] for name in filenames_by_id.values()}
+            for annotation in coco["annotations"]:
+                filename = filenames_by_id.get(annotation["image_id"])
+                if filename is None:
+                    continue
+                x, y, width, height = annotation["bbox"]
+                coco_boxes[filename].append([x, y, x + width, y + height])
+        confidence_threshold = eval_config.get("confidence_threshold", 0.8)
         iou_threshold = eval_config.get("iou_threshold", 0.5)
 
         model = LesionDetector(num_classes=2, pretrained=False)
@@ -186,7 +201,11 @@ def main():
                 keep = scores >= confidence_threshold
                 pred_boxes = pred["boxes"].detach().cpu().numpy()[keep].tolist()
                 pred_scores = scores[keep].tolist()
-                gt_boxes = _mask_to_box(_find_mask(mask_dir, filename))
+                gt_boxes = (
+                    coco_boxes.get(filename, [])
+                    if coco_boxes is not None
+                    else _mask_to_box(_find_mask(mask_dir, filename))
+                )
 
                 predictions.append({"boxes": pred_boxes, "scores": pred_scores})
                 ground_truths.append({"boxes": gt_boxes})
@@ -327,7 +346,7 @@ def main():
                     image_metrics = compute_segmentation_metrics(
                         batch_predictions[i : i + 1],
                         batch_targets[i : i + 1],
-                        threshold=config.get("evaluation", {}).get("threshold", 0.5),
+                        threshold=config.get("evaluation", {}).get("threshold", 0.8),
                     )
                     per_image_rows.append(
                         {
@@ -342,7 +361,7 @@ def main():
         metrics = compute_segmentation_metrics(
             np.concatenate(predictions),
             np.concatenate(targets),
-            threshold=config.get("evaluation", {}).get("threshold", 0.5),
+            threshold=config.get("evaluation", {}).get("threshold", 0.8),
         )
         per_image_metric_names = [
             "dice",
@@ -359,7 +378,7 @@ def main():
             "num_images": len(dataset),
             "checkpoint": args.checkpoint,
             "csv": args.output_csv,
-            "threshold": config.get("evaluation", {}).get("threshold", 0.5),
+            "threshold": config.get("evaluation", {}).get("threshold", 0.8),
             "metrics": metrics,
             "per_image_mean": {
                 name: float(np.mean([row[name] for row in per_image_rows]))

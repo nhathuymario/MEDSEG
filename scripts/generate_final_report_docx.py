@@ -191,10 +191,10 @@ def build_document_xml():
     body.append(section_title("6. Huấn luyện và quản lý mô hình"))
     body.append(table([
         ["Checkpoint", "Ý nghĩa"],
-        ["outputs/checkpoints/best_detection.pth", "Faster R-CNN phát hiện tổn thương da ISIC."],
-        ["outputs/checkpoints/best_segmentation.pth", "Attention U-Net phân đoạn tổn thương da ISIC."],
-        ["outputs/checkpoints/best_chest_xray_segmentation.pth", "Attention U-Net phân đoạn phổi X-quang."],
-        ["outputs/checkpoints/best_segmentation_unet_baseline.pth", "U-Net baseline phân đoạn tổn thương da ISIC."],
+        ["outputs/detection/checkpoints/best_detection.pth", "Faster R-CNN phát hiện tổn thương da ISIC."],
+        ["outputs/segmentation/skin/checkpoints/best_segmentation.pth", "Attention U-Net phân đoạn tổn thương da ISIC."],
+        ["outputs/segmentation/chest_xray/checkpoints/best_chest_xray_segmentation.pth", "Attention U-Net phân đoạn phổi X-quang."],
+        ["outputs/segmentation/skin/checkpoints/best_segmentation_unet_baseline.pth", "U-Net baseline phân đoạn tổn thương da ISIC."],
     ], [4300, 5060]))
 
     body.append(para("Các mô hình segmentation được huấn luyện 100 epoch với Adam, learning rate khởi tạo 1e-4, Dice+BCE loss và CosineAnnealingLR. Checkpoint tốt nhất được chọn theo validation Dice; test split không được dùng để chọn checkpoint."))
@@ -262,7 +262,7 @@ def build_document_xml():
     body.append(para("Cảnh báo diễn giải: diagnostic này gồm cả dữ liệu huấn luyện nên không chứng minh khả năng tổng quát hóa. Việc tăng số ảnh làm khoảng tin cậy hẹp hơn nhưng không biến nó thành benchmark độc lập."))
 
     body.append(section_title("9. Triển khai và kiểm thử"))
-    body.append(para("Backend chạy bằng FastAPI tại http://localhost:8000; tài liệu Swagger tại /docs. Frontend Vite chạy tại http://localhost:5173. API tests và model tests được thực thi bằng pytest; frontend được kiểm tra bằng ESLint/build Vite. Trang Metrics đọc trực tiếp artifact trong outputs/metrics thay vì hard-code kết quả."))
+    body.append(para("Backend chạy bằng FastAPI tại http://localhost:8000; tài liệu Swagger tại /docs. Frontend Vite chạy tại http://localhost:5173. API tests và model tests được thực thi bằng pytest; frontend được kiểm tra bằng ESLint/build Vite. Trang Metrics đọc trực tiếp artifact theo từng chức năng trong outputs thay vì hard-code kết quả."))
 
     body.append(section_title("10. Hạn chế, rủi ro và hướng phát triển"))
     body.append(table([
@@ -286,13 +286,13 @@ def build_document_xml():
         ["uvicorn api.main:app --reload --port 8000", "Chạy backend."],
         ["npm run dev", "Chạy frontend tại http://localhost:5173."],
         ["python scripts/evaluate.py --model segmentation --config <config> --checkpoint <pth> --split test --output-csv <csv>", "Đánh giá segmentation holdout."],
-        ["python scripts/evaluate.py --model detection --config configs/detection_config.yaml --checkpoint outputs/checkpoints/best_detection.pth --split test --output-csv <csv>", "Đánh giá detection holdout."],
-        ["python scripts/evaluate_pipeline.py --split test --output-csv outputs/metrics/isic2018_pipeline_test_per_image.csv", "Đánh giá full pipeline."],
-        ["python scripts/evaluate.py --model segmentation --config configs/segmentation_unet_baseline_config.yaml --checkpoint outputs/checkpoints/best_segmentation_unet_baseline.pth --split all --output-csv outputs/metrics/isic2018_unet_baseline_all_2594_per_image.csv", "Chạy large-set diagnostic."],
+        ["python scripts/evaluate.py --model detection --config configs/detection_config.yaml --checkpoint outputs/detection/checkpoints/best_detection.pth --split test --output-csv <csv>", "Đánh giá detection holdout."],
+        ["python scripts/evaluate_pipeline.py --split test --output-csv outputs/pipeline/metrics/isic2018_pipeline_test_per_image.csv", "Đánh giá full pipeline."],
+        ["python scripts/evaluate.py --model segmentation --config configs/segmentation_unet_baseline_config.yaml --checkpoint outputs/segmentation/skin/checkpoints/best_segmentation_unet_baseline.pth --split all --output-csv outputs/segmentation/skin/metrics/isic2018_unet_baseline_all_2594_per_image.csv", "Chạy large-set diagnostic."],
     ], [4300, 5060]))
 
     body.append(subsection("12.1 Artifact kết quả"))
-    body.append(para("Các file chuẩn để kiểm chứng gồm: isic2018_detection_test_per_image.summary.json, isic2018_test_per_image.summary.json, isic2018_unet_baseline_test_per_image.summary.json, chest_xray_test_per_image.summary.json, isic2018_pipeline_test_per_image.summary.json và isic2018_unet_baseline_all_2594_per_image.summary.json trong outputs/metrics."))
+    body.append(para("Các file kiểm chứng được tách theo chức năng trong outputs/detection/metrics, outputs/segmentation/*/metrics và outputs/pipeline/metrics."))
 
     sect = (
         '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/>'

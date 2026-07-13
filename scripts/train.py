@@ -4,6 +4,7 @@ import csv
 import sys
 import yaml
 from pathlib import Path
+from torch.utils.data import ConcatDataset
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -34,6 +35,17 @@ def _read_split(split_dir, split_name):
         return [row["filename"] for row in csv.DictReader(handle)]
 
 
+def _detection_dataset(source, split_name, image_size, train):
+    split_dir = source["split_dir"]
+    files = _read_split(split_dir, split_name)
+    return DetectionDataset(
+        image_dir=source["image_dir"],
+        annotation_file=source["annotation_file"],
+        file_list=files,
+        transforms=get_detection_transforms(size=image_size, train=train),
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, help="Path to config yaml")
@@ -57,34 +69,62 @@ def main():
 
     # Data
     if model_name == "faster_rcnn":
-        if dataset_name != "isic2018":
-            raise ValueError("Faster R-CNN training currently supports ISIC 2018 only.")
-        split_dir = data_config.get("split_dir", f"data/splits/{dataset_name}")
-        train_files = _read_split(split_dir, "train")
-        val_files = _read_split(split_dir, "val")
-        train_ds = DetectionDataset(
-            image_dir=data_config.get(
+        sources = data_config.get("sources") or [{
+            "image_dir": data_config.get(
                 "image_dir", "data/processed/isic2018/images"
             ),
-            annotation_file=data_config.get(
+            "annotation_file": data_config.get(
                 "annotation_file",
                 "data/processed/isic2018/annotations/train.json",
             ),
-            file_list=train_files,
-            transforms=get_detection_transforms(size=image_size, train=True),
-        )
-        val_ds = DetectionDataset(
-            image_dir=data_config.get(
-                "image_dir", "data/processed/isic2018/images"
+            "split_dir": data_config.get(
+                "split_dir", f"data/splits/{dataset_name}"
             ),
-            annotation_file=data_config.get(
-                "annotation_file",
-                "data/processed/isic2018/annotations/train.json",
-            ),
-            file_list=val_files,
-            transforms=get_detection_transforms(size=image_size, train=False),
+            "train_split": "train",
+            "val_split": "val",
+            "use_for_validation": True,
+        }]
+        train_sets = [
+            _detection_dataset(
+                source,
+                source.get("train_split", "train"),
+                image_size,
+                train=True,
+            )
+            for source in sources
+        ]
+        val_sets = [
+            _detection_dataset(
+                source,
+                source.get("val_split", "val"),
+                image_size,
+                train=False,
+            )
+            for source in sources
+            if source.get("use_for_validation", True)
+            and source.get("val_split")
+        ]
+        train_ds = train_sets[0] if len(train_sets) == 1 else ConcatDataset(train_sets)
+        val_ds = (
+            val_sets[0]
+            if len(val_sets) == 1
+            else ConcatDataset(val_sets)
+            if val_sets
+            else None
         )
-        model = LesionDetector(num_classes=config["model"]["num_classes"])
+        model_config = config["model"]
+        initial_checkpoint = config.get("training", {}).get("initial_checkpoint")
+        model = (
+            LesionDetector.from_checkpoint(
+                initial_checkpoint,
+                num_classes=model_config["num_classes"],
+            )
+            if initial_checkpoint
+            else LesionDetector(
+                num_classes=model_config["num_classes"],
+                pretrained=model_config.get("pretrained", True),
+            )
+        )
         training_config = {
             **data_config,
             **config.get("training", {}),
@@ -146,6 +186,8 @@ def main():
 
 if __name__ == "__main__":
     # Ensure output dir exists
-    Path("outputs/checkpoints").mkdir(parents=True, exist_ok=True)
-    Path("outputs/logs").mkdir(parents=True, exist_ok=True)
+    Path("outputs/detection/checkpoints").mkdir(parents=True, exist_ok=True)
+    Path("outputs/detection/logs").mkdir(parents=True, exist_ok=True)
+    Path("outputs/segmentation/skin/checkpoints").mkdir(parents=True, exist_ok=True)
+    Path("outputs/segmentation/skin/logs").mkdir(parents=True, exist_ok=True)
     main()

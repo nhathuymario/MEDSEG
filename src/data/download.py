@@ -18,6 +18,24 @@ NLM_CXR_BASE_URL = (
     "https://data.lhncbc.nlm.nih.gov/public/"
     "Tuberculosis-Chest-X-ray-Datasets/"
 )
+ITOBOS_BUNDLE_URL = (
+    "https://isic-archive.s3.amazonaws.com/dois/10.34970-561126/"
+    "itobos-2024-skin-lesion-detection-with-3d-tbp.zip"
+)
+ITOBOS_PNG_URL = "https://ndownloader.figshare.com/files/54464144"
+ITOBOS_SUPPLEMENTS = {
+    "metadata.csv": (
+        "https://isic-archive.s3.amazonaws.com/dois/10.34970-561126/"
+        "itobos-2024-skin-lesion-detection-with-3d-tbp.csv"
+    ),
+    "supplement_metadata.csv": (
+        "https://isic-archive.s3.amazonaws.com/dois/10.34970-561126/"
+        "supplements/supplement_metadata.csv"
+    ),
+    "split.csv": "https://isic-archive.s3.amazonaws.com/dois/10.34970-561126/supplements/split.csv",
+    "labels.json": "https://isic-archive.s3.amazonaws.com/dois/10.34970-561126/supplements/labels.json",
+    "labels.zip": "https://isic-archive.s3.amazonaws.com/dois/10.34970-561126/supplements/labels.zip",
+}
 
 
 class _LinkParser(HTMLParser):
@@ -170,6 +188,31 @@ def download_isic2018(base_dir: Path = RAW_DIR / "isic2018"):
     print("ISIC 2018 download complete!")
 
 
+def download_itobos(base_dir: Path = RAW_DIR / "clinical_skin" / "itobos"):
+    """Download the recommended JPEG iToBoS bundle and annotations."""
+    base_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = base_dir / "itobos-2024-skin-lesion-detection-with-3d-tbp.zip"
+    _download_file(ITOBOS_BUNDLE_URL, zip_path, retries=20, validate_zip=True)
+    _extract_zip(zip_path, base_dir)
+    supplements_dir = base_dir / "supplements"
+    for name, url in ITOBOS_SUPPLEMENTS.items():
+        _download_file(
+            url,
+            supplements_dir / name,
+            retries=10,
+            validate_zip=name.endswith(".zip"),
+        )
+    print("iToBoS clinical skin download complete!")
+
+
+def download_itobos_png(base_dir: Path = RAW_DIR / "clinical_skin" / "itobos"):
+    """Download the optional full-resolution PNG archive with resume support."""
+    base_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = base_dir / "itobos2024data_v08052025_merged.zip"
+    _download_file(ITOBOS_PNG_URL, zip_path, retries=20, validate_zip=True)
+    _extract_zip(zip_path, base_dir)
+
+
 def download_chest_xray(
     base_dir: Path = RAW_DIR / "chest_xray",
     datasets=("montgomery", "shenzhen"),
@@ -280,13 +323,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download MedSeg datasets")
     parser.add_argument(
         "--dataset",
-        choices=("all", "isic2018", "chest_xray", "montgomery", "shenzhen"),
+        choices=("all", "isic2018", "itobos", "itobos-png", "chest_xray", "montgomery", "shenzhen"),
         default="all",
     )
     args = parser.parse_args()
 
     if args.dataset in ("all", "isic2018"):
         download_isic2018()
+    if args.dataset in ("all", "itobos"):
+        download_itobos()
+    if args.dataset == "itobos-png":
+        download_itobos_png()
     if args.dataset in ("all", "chest_xray"):
         download_chest_xray()
     elif args.dataset in ("montgomery", "shenzhen"):
