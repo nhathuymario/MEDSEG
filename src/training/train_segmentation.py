@@ -27,13 +27,13 @@ def train_segmentation(model, train_dataset, val_dataset=None, config=None):
     checkpoint_path = Path(
         cfg.get(
             "checkpoint_path",
-            "outputs/checkpoints/best_segmentation.pth",
+            "outputs/segmentation/skin/checkpoints/best_segmentation.pth",
         )
     )
     history_path = Path(
         cfg.get(
             "history_path",
-            f"outputs/logs/{checkpoint_path.stem}_training_history.csv",
+            f"outputs/segmentation/skin/logs/{checkpoint_path.stem}_training_history.csv",
         )
     )
     use_amp = cfg.get("mixed_precision", True) and device.type == "cuda"

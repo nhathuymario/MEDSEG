@@ -24,12 +24,12 @@ def train_detection(model, train_dataset, val_dataset=None, config=None):
     num_workers = cfg.get("num_workers", 0)
     iou_threshold = cfg.get("iou_threshold", 0.5)
     checkpoint_path = Path(
-        cfg.get("checkpoint_path", "outputs/checkpoints/best_detection.pth")
+        cfg.get("checkpoint_path", "outputs/detection/checkpoints/best_detection.pth")
     )
     history_path = Path(
         cfg.get(
             "history_path",
-            f"outputs/logs/{checkpoint_path.stem}_training_history.csv",
+            f"outputs/detection/logs/{checkpoint_path.stem}_training_history.csv",
         )
     )
 
