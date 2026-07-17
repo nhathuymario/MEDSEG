@@ -9,6 +9,11 @@ from PIL import Image
 from pathlib import Path
 
 
+def _first_existing(*paths):
+    """Return the first existing artifact path during output-folder migration."""
+    return next((str(Path(path)) for path in paths if Path(path).exists()), str(Path(paths[0])))
+
+
 class ModelService:
     _instance = None
 
@@ -40,7 +45,10 @@ class ModelService:
 
         chest_checkpoint = os.getenv(
             "CHEST_XRAY_CHECKPOINT",
-            "outputs/checkpoints/best_chest_xray_segmentation.pth",
+            _first_existing(
+                "outputs/segmentation/chest_xray/checkpoints/best_chest_xray_segmentation.pth",
+                "outputs/checkpoints/best_chest_xray_segmentation.pth",
+            ),
         )
         if (
             Path(chest_checkpoint).exists()
@@ -53,9 +61,18 @@ class ModelService:
             )
             self.load_model("chest_segmentor", model, chest_checkpoint)
 
+        multidomain_checkpoint = _first_existing(
+            "outputs/detection/checkpoints/best_detection_multidomain.pth",
+            "outputs/checkpoints/best_detection_multidomain.pth",
+        )
         detection_checkpoint = os.getenv(
             "ISIC_DETECTION_CHECKPOINT",
-            "outputs/checkpoints/best_detection.pth",
+            multidomain_checkpoint
+            if Path(multidomain_checkpoint).exists()
+            else _first_existing(
+                "outputs/detection/checkpoints/best_detection.pth",
+                "outputs/checkpoints/best_detection.pth",
+            ),
         )
         if Path(detection_checkpoint).exists() and "detector" not in self.models:
             detector = LesionDetector(num_classes=2, pretrained=False)
@@ -63,7 +80,10 @@ class ModelService:
 
         isic_segmentation_checkpoint = os.getenv(
             "ISIC_SEGMENTATION_CHECKPOINT",
-            "outputs/checkpoints/best_segmentation.pth",
+            _first_existing(
+                "outputs/segmentation/skin/checkpoints/best_segmentation.pth",
+                "outputs/checkpoints/best_segmentation.pth",
+            ),
         )
         if (
             Path(isic_segmentation_checkpoint).exists()

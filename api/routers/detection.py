@@ -1,6 +1,6 @@
 """Detection endpoint."""
 import time
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from api.schemas.responses import DetectionResult
 from api.services.model_service import model_service
 from src.pipeline.inference import run_detection
@@ -10,7 +10,10 @@ router = APIRouter()
 
 
 @router.post("/detect", response_model=DetectionResult)
-async def detect(file: UploadFile = File(...)):
+async def detect(
+    file: UploadFile = File(...),
+    threshold: float = Query(default=0.5, ge=0.05, le=1.0, description="Confidence threshold"),
+):
     image = model_service.decode_upload(await file.read())
     detector = model_service.get_model("detector")
     if detector is None:
@@ -23,7 +26,7 @@ async def detect(file: UploadFile = File(...)):
         )
 
     t0 = time.time()
-    result = run_detection(detector, image, str(model_service.device))
+    result = run_detection(detector, image, str(model_service.device), threshold=threshold)
     overlay = draw_boxes(image, result["boxes"], result["scores"])
 
     return DetectionResult(

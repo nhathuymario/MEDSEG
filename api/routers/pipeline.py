@@ -1,6 +1,6 @@
 """Full pipeline endpoint: Detection → Segmentation."""
 import time
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from api.schemas.responses import PipelineResult, DetectionResult
 from api.services.model_service import model_service
 
@@ -8,7 +8,10 @@ router = APIRouter()
 
 
 @router.post("/pipeline", response_model=PipelineResult)
-async def run_pipeline(file: UploadFile = File(...)):
+async def run_pipeline(
+    file: UploadFile = File(...),
+    threshold: float = Query(default=0.5, ge=0.05, le=1.0, description="Detection confidence threshold")
+):
     image = model_service.decode_upload(await file.read())
 
     t0 = time.time()
@@ -31,27 +34,16 @@ async def run_pipeline(file: UploadFile = File(...)):
             ),
         )
 
-    # Detection
-    from src.pipeline.inference import run_detection, run_segmentation
-    from src.evaluation.visualize import draw_boxes, overlay_mask
-    import numpy as np
+    from src.pipeline.full_pipeline import MedSegPipeline
 
-    det = run_detection(detector, image, str(model_service.device))
-
-    # Segmentation per ROI
-    masks_b64 = []
-    full_mask = np.zeros(image.shape[:2], dtype=np.uint8)
-    for box in det["boxes"]:
-        x1, y1, x2, y2 = map(int, box)
-        roi = image[y1:y2, x1:x2]
-        if roi.size == 0 or segmentor is None:
-            continue
-        mask = run_segmentation(segmentor, roi, str(model_service.device))
-        full_mask[y1:y2, x1:x2] = np.maximum(full_mask[y1:y2, x1:x2], mask)
-        masks_b64.append(model_service.image_to_base64(mask * 255))
-
-    vis = draw_boxes(image, det["boxes"], det["scores"]) if det["boxes"] else image
-    vis = overlay_mask(vis, full_mask)
+    pipeline = MedSegPipeline(detector, segmentor, str(model_service.device))
+    result = pipeline.run(image, det_thresh=threshold, seg_thresh=0.8, roi_margin=0.1)
+    det = result["detection"]
+    masks_b64 = [
+        model_service.image_to_base64(item["mask"] * 255)
+        for item in result["segmentations"]
+    ]
+    vis = pipeline.visualize(image, result)
 
     return PipelineResult(
         detection=DetectionResult(boxes=det["boxes"], scores=det["scores"], labels=det["labels"], inference_time_ms=0),
