@@ -34,6 +34,7 @@ export default function Analyze() {
   const [preview, setPreview] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [health, setHealth] = useState(null);
+  const [threshold, setThreshold] = useState(0.5);
   const inputRef = useRef();
   const { analyze, result, loading, error, setResult } = useAnalysis();
 
@@ -74,7 +75,7 @@ export default function Analyze() {
 
   const handleSubmit = async () => {
     if (!file || !selectedModeReady) return;
-    const analysisResult = await analyze(file, mode);
+    const analysisResult = await analyze(file, mode, threshold);
     if (!analysisResult) return;
     const detections = (
       analysisResult.boxes
@@ -116,6 +117,24 @@ export default function Analyze() {
 
       {preview && (
         <>
+          {(mode === 'detect' || mode === 'pipeline') && (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <h3 style={{ marginBottom: 12 }}>Tùy chỉnh</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <label style={{ flexShrink: 0 }}>Ngưỡng Confidence (mAP): {threshold.toFixed(2)}</label>
+                <input 
+                  type="range" 
+                  min="0.05" 
+                  max="1.0" 
+                  step="0.05" 
+                  value={threshold} 
+                  onChange={(e) => setThreshold(parseFloat(e.target.value))} 
+                  style={{ flexGrow: 1 }}
+                />
+              </div>
+            </div>
+          )}
+
           <button className="btn btn-primary" onClick={handleSubmit} disabled={loading || !selectedModeReady} style={{ marginBottom: 16 }}>
             {loading ? <><span className="loading-spinner" /> Đang phân tích...</> : `Chạy ${activeMode.title}`}
           </button>

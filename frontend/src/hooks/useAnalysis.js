@@ -6,12 +6,12 @@ export function useAnalysis() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
-  const analyze = async (file, mode = 'pipeline') => {
+  const analyze = async (file, mode = 'pipeline', threshold) => {
     setLoading(true);
     setError(null);
     try {
       const fn = { detect: api.detect, segment: api.segment, pipeline: api.pipeline };
-      const data = await fn[mode](file);
+      const data = await fn[mode](file, threshold);
       const nextResult = { ...data, mode, timestamp: Date.now() };
       setResult(nextResult);
       return nextResult;

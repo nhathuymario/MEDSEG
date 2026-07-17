@@ -34,9 +34,9 @@ async function postJson(endpoint) {
 
 export const api = {
   health: () => get('/health'),
-  detect: (file) => post('/detect', file),
+  detect: (file, threshold) => post(`/detect${threshold !== undefined ? `?threshold=${threshold}` : ''}`, file),
   segment: (file) => post('/segment', file),
-  pipeline: (file) => post('/pipeline', file),
+  pipeline: (file, threshold) => post(`/pipeline${threshold !== undefined ? `?threshold=${threshold}` : ''}`, file),
   metrics: () => get('/metrics'),
   evaluationStatus: () => get('/metrics/evaluation-status'),
   runEvaluation: (kind, limit) => postJson(`/metrics/evaluate/${kind}?limit=${limit}`),
