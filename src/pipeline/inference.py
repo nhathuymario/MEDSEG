@@ -48,7 +48,8 @@ def letterbox_image(image: np.ndarray, size: int, fill=IMAGENET_MEAN_RGB):
 def run_detection(model, image: np.ndarray, device="cpu", threshold=0.8):
     """Chạy Faster R-CNN trên một ảnh và trả về boxes/scores/labels."""
     model.eval().to(device)
-    img_tensor = T.ToTensor()(cv2.cvtColor(image, cv2.COLOR_BGR2RGB)).to(device)
+    img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    img_tensor = TRANSFORM(img).to(device)
 
     with torch.no_grad():
         preds = model([img_tensor])[0]

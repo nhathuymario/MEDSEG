@@ -232,6 +232,7 @@ def main():
         summary = {
             "model": "detection",
             "dataset": data_config.get("dataset", "isic2018"),
+            "evaluation_model": data_config.get("evaluation_model", data_config.get("dataset", "isic2018")),
             "split": args.split,
             "evaluation_scope": "diagnostic_includes_training_data" if args.split == "all" else "holdout_split",
             "num_images": len(files),
@@ -239,6 +240,7 @@ def main():
             "csv": args.output_csv,
             "confidence_threshold": confidence_threshold,
             "iou_threshold": iou_threshold,
+            "ap_method": "all_point_interpolated_pr_auc",
             "map": float(map_50),
             "precision": float(precision),
             "recall": float(recall),

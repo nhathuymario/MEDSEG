@@ -15,12 +15,19 @@ def compute_iou(box1, box2):
 
 
 def compute_ap(precisions, recalls):
-    """Tính Average Precision bằng nội suy 11 điểm."""
-    ap = 0
-    for t in np.arange(0, 1.1, 0.1):
-        prec_at_rec = [p for p, r in zip(precisions, recalls) if r >= t]
-        ap += max(prec_at_rec) if prec_at_rec else 0
-    return ap / 11
+    """Compute all-point interpolated AP as area under the PR envelope.
+
+    Unlike the legacy VOC 2007 11-point approximation, this does not award a
+    fixed 1/11 AP to a detector whose maximum recall is only a tiny fraction.
+    """
+    if not precisions or not recalls:
+        return 0.0
+    mrec = np.concatenate(([0.0], np.asarray(recalls, dtype=float), [1.0]))
+    mpre = np.concatenate(([0.0], np.asarray(precisions, dtype=float), [0.0]))
+    for index in range(mpre.size - 2, -1, -1):
+        mpre[index] = max(mpre[index], mpre[index + 1])
+    changing_recall = np.where(mrec[1:] != mrec[:-1])[0]
+    return float(np.sum((mrec[changing_recall + 1] - mrec[changing_recall]) * mpre[changing_recall + 1]))
 
 
 def compute_map(predictions, ground_truths, iou_threshold=0.5):

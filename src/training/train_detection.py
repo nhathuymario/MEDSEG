@@ -12,6 +12,33 @@ def detection_collate(batch):
     return list(zip(*batch))
 
 
+def _build_scheduler(optimizer, cfg):
+    """Build LR scheduler based on config.
+
+    Supported: step, cosine, cosine_warm (CosineAnnealingWarmRestarts).
+    """
+    scheduler_name = cfg.get("lr_scheduler", "step")
+    if scheduler_name == "cosine":
+        return torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=cfg.get("epochs", 30),
+            eta_min=cfg.get("lr", 1e-4) * 0.01,
+        )
+    if scheduler_name == "cosine_warm":
+        return torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            optimizer,
+            T_0=cfg.get("T_0", 10),
+            T_mult=1,
+            eta_min=cfg.get("lr", 1e-4) * 0.01,
+        )
+    # default: StepLR
+    return torch.optim.lr_scheduler.StepLR(
+        optimizer,
+        step_size=cfg.get("step_size", 15),
+        gamma=0.1,
+    )
+
+
 def train_detection(model, train_dataset, val_dataset=None, config=None):
     """Huấn luyện detector và lưu checkpoint tốt nhất theo val mAP nếu có."""
     cfg = config or {}
@@ -23,6 +50,8 @@ def train_detection(model, train_dataset, val_dataset=None, config=None):
     batch_size = cfg.get("batch_size", 4)
     num_workers = cfg.get("num_workers", 0)
     iou_threshold = cfg.get("iou_threshold", 0.5)
+    warmup_epochs = cfg.get("warmup_epochs", 0)
+    early_stopping_patience = cfg.get("early_stopping_patience", 0)
     checkpoint_path = Path(
         cfg.get("checkpoint_path", "outputs/detection/checkpoints/best_detection.pth")
     )
@@ -50,11 +79,15 @@ def train_detection(model, train_dataset, val_dataset=None, config=None):
         if val_dataset
         else None
     )
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=cfg.get("weight_decay", 5e-4))
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=cfg.get("step_size", 15), gamma=0.1)
+    optimizer = torch.optim.SGD(
+        model.parameters(), lr=lr, momentum=0.9,
+        weight_decay=cfg.get("weight_decay", 5e-4),
+    )
+    scheduler = _build_scheduler(optimizer, cfg)
 
     best_loss = float("inf")
     best_map = -1.0
+    epochs_without_improvement = 0
     history_path.parent.mkdir(parents=True, exist_ok=True)
     with open(history_path, "w", newline="") as handle:
         writer = csv.DictWriter(
@@ -64,6 +97,12 @@ def train_detection(model, train_dataset, val_dataset=None, config=None):
         writer.writeheader()
 
     for epoch in range(epochs):
+        # ---- Warmup: ramp LR linearly for the first N epochs ----
+        if warmup_epochs > 0 and epoch < warmup_epochs:
+            warmup_lr = lr * (epoch + 1) / warmup_epochs
+            for pg in optimizer.param_groups:
+                pg["lr"] = warmup_lr
+
         model.train()
         total_loss = 0
         for images, targets in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}"):
@@ -81,9 +120,12 @@ def train_detection(model, train_dataset, val_dataset=None, config=None):
             optimizer.step()
             total_loss += loss.item()
 
-        scheduler.step()
+        # Step scheduler after warmup phase
+        if epoch >= warmup_epochs:
+            scheduler.step()
+
         avg_loss = total_loss / len(train_loader)
-        current_lr = scheduler.get_last_lr()[0]
+        current_lr = optimizer.param_groups[0]["lr"]
         val_map = None
         if val_loader:
             model.eval()
@@ -139,10 +181,22 @@ def train_detection(model, train_dataset, val_dataset=None, config=None):
         if improved:
             checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
             torch.save(model.state_dict(), checkpoint_path)
+            epochs_without_improvement = 0
             if val_map is not None:
                 print(f"  Saved best model (val_mAP={best_map:.4f})")
             else:
                 print(f"  Saved best model (loss={best_loss:.4f})")
+        else:
+            epochs_without_improvement += 1
+
+        # ---- Early stopping ----
+        if early_stopping_patience > 0 and epochs_without_improvement >= early_stopping_patience:
+            print(
+                f"  Early stopping: val metric không cải thiện sau "
+                f"{early_stopping_patience} epoch. "
+                f"Best val_mAP={best_map:.4f}."
+            )
+            break
 
     print(f"Saved training history to {history_path}")
     return model
