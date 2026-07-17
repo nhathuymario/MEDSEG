@@ -1,0 +1,16 @@
+model:
+  name: faster_rcnn
+  backbone: resnet50
+  pretrained: false
+  num_classes: 2
+
+data:
+  dataset: itobos_clinical
+  evaluation_model: multidomain_skin
+  image_dir: data/raw/clinical_skin/itobos/images
+  annotation_file: data/raw/clinical_skin/itobos/supplements/labels.json
+  split_dir: data/splits/itobos
+
+evaluation:
+  iou_threshold: 0.5
+  confidence_threshold: 0.8

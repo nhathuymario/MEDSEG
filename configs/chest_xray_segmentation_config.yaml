@@ -20,7 +20,8 @@ training:
   loss: dice_bce
   lr_scheduler: cosine
   mixed_precision: true
-  checkpoint_path: outputs/checkpoints/best_chest_xray_segmentation.pth
+  checkpoint_path: outputs/segmentation/chest_xray/checkpoints/best_chest_xray_segmentation.pth
+  history_path: outputs/segmentation/chest_xray/logs/best_chest_xray_segmentation_training_history.csv
 
 evaluation:
   threshold: 0.5

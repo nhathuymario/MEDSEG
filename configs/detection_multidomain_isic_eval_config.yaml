@@ -1,0 +1,16 @@
+model:
+  name: faster_rcnn
+  backbone: resnet50
+  pretrained: false
+  num_classes: 2
+
+data:
+  dataset: isic2018
+  evaluation_model: multidomain_skin
+  image_dir: data/processed/isic2018/images
+  annotation_file: data/processed/isic2018/annotations/train.json
+  split_dir: data/splits/isic2018
+
+evaluation:
+  iou_threshold: 0.5
+  confidence_threshold: 0.5

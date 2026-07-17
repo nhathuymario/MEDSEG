@@ -19,6 +19,8 @@ training:
   optimizer: adam
   loss: dice_bce
   lr_scheduler: cosine
+  checkpoint_path: outputs/segmentation/skin/checkpoints/best_segmentation.pth
+  history_path: outputs/segmentation/skin/logs/best_segmentation_training_history.csv
 
 evaluation:
-  threshold: 0.5
+  threshold: 0.8

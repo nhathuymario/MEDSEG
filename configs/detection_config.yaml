@@ -6,6 +6,7 @@ model:
 
 data:
   dataset: isic2018
+  evaluation_model: isic2018
   image_dir: data/processed/isic2018/images
   annotation_file: data/processed/isic2018/annotations/train.json
   split_dir: data/splits/isic2018
@@ -19,7 +20,9 @@ training:
   weight_decay: 0.0005
   lr_scheduler: step
   step_size: 20
+  checkpoint_path: outputs/detection/checkpoints/best_detection.pth
+  history_path: outputs/detection/logs/best_detection_training_history.csv
 
 evaluation:
   iou_threshold: 0.5
-  confidence_threshold: 0.5
+  confidence_threshold: 0.8
